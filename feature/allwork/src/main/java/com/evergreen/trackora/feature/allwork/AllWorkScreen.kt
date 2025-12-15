@@ -1,0 +1,46 @@
+package com.evergreen.trackora.feature.allwork
+
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+
+/**
+ * Screen for viewing all work entries.
+ * TODO: Implement the list of all work entries
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AllWorkScreen(
+    onNavigateBack: () -> Unit
+) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(text = "All Work Entries")
+                }
+            )
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(16.dp)
+        ) {
+            Text(
+                text = "All Work Entries Screen",
+                modifier = Modifier.padding(16.dp)
+            )
+            // TODO: Implement list of all work entries
+        }
+    }
+}
+
