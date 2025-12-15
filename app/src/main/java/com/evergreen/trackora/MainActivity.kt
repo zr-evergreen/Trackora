@@ -14,6 +14,7 @@ import com.evergreen.trackora.locale.LocaleManager
 import com.evergreen.trackora.navigation.NavGraph
 import com.evergreen.trackora.navigation.TodayRoute
 import com.evergreen.trackora.ui.theme.TrackoraTheme
+import com.evergreen.trackora.theme.ThemeManager
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.launch
@@ -25,11 +26,13 @@ import kotlinx.coroutines.launch
 class MainActivity : AppCompatActivity() {
 
     @Inject lateinit var localeManager: LocaleManager
+    @Inject lateinit var themeManager: ThemeManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         lifecycleScope.launch {
             localeManager.applySavedLocale()
+            themeManager.applySavedTheme()
         }
         enableEdgeToEdge()
         setContent {
