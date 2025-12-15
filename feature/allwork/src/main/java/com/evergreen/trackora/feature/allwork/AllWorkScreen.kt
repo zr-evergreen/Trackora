@@ -6,11 +6,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -23,11 +22,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import com.evergreen.trackora.domain.model.Status
 import com.evergreen.trackora.domain.model.WorkEntry
 import com.evergreen.trackora.feature.allwork.R
+import com.evergreen.trackora.ui.components.TrackoraScreenContainer
+import com.evergreen.trackora.ui.components.StatusPill
 
 /**
  * Screen for viewing all work entries with quick status filters.
@@ -40,11 +41,10 @@ fun AllWorkScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    Column(
+    TrackoraScreenContainer(
         modifier = Modifier
             .fillMaxSize()
             .padding(contentPadding)
-            .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
         Text(
             text = stringResource(id = R.string.all_work_title),
@@ -127,11 +127,11 @@ private fun AllWorkListItem(
     entry: WorkEntry,
     onClick: () -> Unit
 ) {
-    Card(
+    androidx.compose.material3.Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 6.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 2.dp),
         onClick = onClick
     ) {
         Column(
@@ -139,29 +139,42 @@ private fun AllWorkListItem(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            Text(
-                text = entry.title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            entry.quantity?.let {
-                Text(
-                    text = stringResource(id = R.string.qty_label, it),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = entry.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    entry.quantity?.let {
+                        Text(
+                            text = stringResource(id = R.string.qty_label, it),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                StatusPill(
+                    label = when (entry.status) {
+                        Status.IN_PROGRESS -> stringResource(id = R.string.filter_in_progress)
+                        Status.COMPLETED -> stringResource(id = R.string.filter_completed)
+                        Status.DELIVERED -> stringResource(id = R.string.filter_delivered)
+                    },
+                    backgroundColor = when (entry.status) {
+                        Status.IN_PROGRESS -> androidx.compose.ui.graphics.Color(0xFFFF9800)
+                        Status.COMPLETED -> androidx.compose.ui.graphics.Color(0xFF4CAF50)
+                        Status.DELIVERED -> androidx.compose.ui.graphics.Color(0xFF2196F3)
+                    }
                 )
             }
-            Text(
-                text = when (entry.status) {
-                    Status.IN_PROGRESS -> stringResource(id = R.string.filter_in_progress)
-                    Status.COMPLETED -> stringResource(id = R.string.filter_completed)
-                    Status.DELIVERED -> stringResource(id = R.string.filter_delivered)
-                },
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary
-            )
         }
     }
 }

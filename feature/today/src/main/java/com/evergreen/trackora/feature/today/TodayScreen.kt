@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -21,16 +19,17 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.evergreen.trackora.feature.today.R
 import com.evergreen.trackora.domain.model.Status
 import com.evergreen.trackora.domain.model.WorkEntry
+import com.evergreen.trackora.feature.today.R
+import com.evergreen.trackora.ui.components.TrackoraScreenContainer
+import com.evergreen.trackora.ui.components.TrackoraSummaryCard
 import com.evergreen.trackora.ui.theme.TrackoraTheme
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -48,11 +47,10 @@ fun TodayScreen(
     val today = LocalDate.now()
     val dateFormatter = DateTimeFormatter.ofPattern(stringResource(id = R.string.today_date_format))
     
-    Column(
+    TrackoraScreenContainer(
         modifier = Modifier
             .fillMaxSize()
             .padding(contentPadding)
-            .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
         Column(
             modifier = Modifier.fillMaxWidth()
@@ -92,14 +90,14 @@ fun TodayScreen(
                     contentPadding = PaddingValues(vertical = 8.dp)
                 ) {
                     item {
-                        SummaryCard(
+                        SummaryCardModern(
                             completedCount = uiState.completedCount,
                             deliveredCount = uiState.deliveredCount,
                             modifier = Modifier.fillMaxWidth()
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                     }
-                    
+
                     items(
                         items = uiState.todayEntries,
                         key = { it.id }
@@ -118,72 +116,18 @@ fun TodayScreen(
 }
 
 @Composable
-private fun SummaryCard(
+private fun SummaryCardModern(
     completedCount: Int,
     deliveredCount: Int,
     modifier: Modifier = Modifier
 ) {
-    Card(
+    TrackoraSummaryCard(
         modifier = modifier,
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
-        )
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            Text(
-                text = stringResource(id = R.string.today_summary),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                SummaryItem(
-                    label = stringResource(id = R.string.today_completed),
-                    count = completedCount,
-                    color = Color(0xFF4CAF50)
-                )
-                SummaryItem(
-                    label = stringResource(id = R.string.today_delivered),
-                    count = deliveredCount,
-                    color = Color(0xFF2196F3)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SummaryItem(
-    label: String,
-    count: Int,
-    color: Color,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = count.toString(),
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = color
-        )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onPrimaryContainer
-        )
-    }
+        leftTitle = stringResource(id = R.string.today_completed),
+        leftValue = completedCount.toString(),
+        rightTitle = stringResource(id = R.string.today_delivered),
+        rightValue = deliveredCount.toString()
+    )
 }
 
 @Composable
