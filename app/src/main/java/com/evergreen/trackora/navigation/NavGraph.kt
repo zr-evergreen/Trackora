@@ -5,6 +5,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Today
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -15,6 +16,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -26,6 +28,8 @@ import com.evergreen.trackora.feature.addedit.AddEditWorkScreen
 import com.evergreen.trackora.feature.allwork.allWorkNavigation
 import com.evergreen.trackora.feature.reports.reportsNavigation
 import com.evergreen.trackora.feature.today.todayNavigation
+import com.evergreen.trackora.ui.settings.SettingsScreen
+import com.evergreen.trackora.R
 
 /**
  * Main navigation graph for the app with Bottom Navigation.
@@ -59,7 +63,7 @@ fun NavGraph(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Add,
-                        contentDescription = "Add Work Entry"
+                        contentDescription = stringResource(id = R.string.content_add_work_entry)
                     )
                 }
             }
@@ -82,6 +86,10 @@ fun NavGraph(
             )
             
             reportsNavigation(contentPadding = paddingValues)
+
+            composable<SettingsRoute> {
+                SettingsScreen()
+            }
             
             // Add/Edit Work (modal screen)
             composable<AddEditWorkRoute> { backStackEntry ->
@@ -106,8 +114,8 @@ private fun BottomNavigationBar(
     
     NavigationBar {
         NavigationBarItem(
-            icon = { Icon(Icons.Default.Today, contentDescription = "Today") },
-            label = { Text("Today") },
+            icon = { Icon(Icons.Default.Today, contentDescription = stringResource(id = R.string.nav_today)) },
+            label = { Text(stringResource(id = R.string.nav_today)) },
             selected = currentDestination?.hierarchy?.any { 
                 it.route?.contains("TodayRoute") == true 
             } == true,
@@ -122,8 +130,8 @@ private fun BottomNavigationBar(
             }
         )
         NavigationBarItem(
-            icon = { Icon(Icons.Default.Assignment, contentDescription = "All Work") },
-            label = { Text("All Work") },
+            icon = { Icon(Icons.Default.Assignment, contentDescription = stringResource(id = R.string.nav_all_work)) },
+            label = { Text(stringResource(id = R.string.nav_all_work)) },
             selected = currentDestination?.hierarchy?.any { 
                 it.route?.contains("AllWorkRoute") == true 
             } == true,
@@ -138,13 +146,29 @@ private fun BottomNavigationBar(
             }
         )
         NavigationBarItem(
-            icon = { Icon(Icons.Default.BarChart, contentDescription = "Reports") },
-            label = { Text("Reports") },
+            icon = { Icon(Icons.Default.BarChart, contentDescription = stringResource(id = R.string.nav_reports)) },
+            label = { Text(stringResource(id = R.string.nav_reports)) },
             selected = currentDestination?.hierarchy?.any { 
                 it.route?.contains("ReportsRoute") == true 
             } == true,
             onClick = {
                 navController.navigate(ReportsRoute) {
+                    popUpTo(navController.graph.findStartDestination().id) {
+                        saveState = true
+                    }
+                    launchSingleTop = true
+                    restoreState = true
+                }
+            }
+        )
+        NavigationBarItem(
+            icon = { Icon(Icons.Default.Settings, contentDescription = stringResource(id = R.string.nav_settings)) },
+            label = { Text(stringResource(id = R.string.nav_settings)) },
+            selected = currentDestination?.hierarchy?.any { 
+                it.route?.contains("SettingsRoute") == true 
+            } == true,
+            onClick = {
+                navController.navigate(SettingsRoute) {
                     popUpTo(navController.graph.findStartDestination().id) {
                         saveState = true
                     }

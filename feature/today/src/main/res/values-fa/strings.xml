@@ -1,0 +1,10 @@
+<resources>
+    <string name="today_title">امروز</string>
+    <string name="today_date_format">EEEE، d MMM yyyy</string>
+    <string name="today_empty_title">هیچ موردی برای امروز نیست</string>
+    <string name="today_empty_subtitle">برای افزودن کار جدید روی دکمه ➕ بزنید</string>
+    <string name="today_summary">خلاصه</string>
+    <string name="today_completed">تکمیل‌شده</string>
+    <string name="today_delivered">تحویل‌شده</string>
+    <string name="today_add_work_entry">افزودن کار</string>
+</resources>

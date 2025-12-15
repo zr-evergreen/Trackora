@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">تراکورا</string>
+    <string name="nav_today">امروز</string>
+    <string name="nav_all_work">همه کارها</string>
+    <string name="nav_reports">گزارش‌ها</string>
+    <string name="nav_settings">تنظیمات</string>
+    <string name="content_add_work_entry">افزودن کار</string>
+    <string name="settings_title">تنظیمات</string>
+    <string name="settings_language">زبان</string>
+    <string name="language_system_default">زبان دستگاه</string>
+    <string name="language_english">انگلیسی</string>
+    <string name="language_persian">فارسی</string>
+</resources>

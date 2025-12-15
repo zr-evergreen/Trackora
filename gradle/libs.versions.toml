@@ -14,6 +14,7 @@ coroutines = "1.9.0"
 hilt = "2.51.1"
 hiltNavigationCompose = "1.2.0"
 kotlinxSerialization = "1.7.3"
+datastore = "1.1.1"
 mockk = "1.13.8"
 
 [libraries]
@@ -55,6 +56,9 @@ hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-com
 
 # Kotlinx Serialization
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
+
+# DataStore
+datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
 
 # Testing
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }

@@ -2,6 +2,7 @@ package com.evergreen.trackora.feature.today
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,18 +22,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.evergreen.trackora.feature.today.R
 import com.evergreen.trackora.domain.model.Status
 import com.evergreen.trackora.domain.model.WorkEntry
 import com.evergreen.trackora.ui.theme.TrackoraTheme
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
-import androidx.compose.foundation.layout.PaddingValues
 
 /**
  * Today screen - the heart of the app.
@@ -45,7 +46,7 @@ fun TodayScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val today = LocalDate.now()
-    val dateFormatter = DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL)
+    val dateFormatter = DateTimeFormatter.ofPattern(stringResource(id = R.string.today_date_format))
     
     Column(
         modifier = Modifier
@@ -57,7 +58,7 @@ fun TodayScreen(
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(
-                text = "Today",
+                text = stringResource(id = R.string.today_title),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
@@ -90,7 +91,6 @@ fun TodayScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(vertical = 8.dp)
                 ) {
-                    // Summary Card
                     item {
                         SummaryCard(
                             completedCount = uiState.completedCount,
@@ -100,7 +100,6 @@ fun TodayScreen(
                         Spacer(modifier = Modifier.height(16.dp))
                     }
                     
-                    // Work Entries List
                     items(
                         items = uiState.todayEntries,
                         key = { it.id }
@@ -137,7 +136,7 @@ private fun SummaryCard(
                 .padding(16.dp)
         ) {
             Text(
-                text = "Summary",
+                text = stringResource(id = R.string.today_summary),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -148,12 +147,12 @@ private fun SummaryCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 SummaryItem(
-                    label = "Completed",
+                    label = stringResource(id = R.string.today_completed),
                     count = completedCount,
                     color = Color(0xFF4CAF50)
                 )
                 SummaryItem(
-                    label = "Delivered",
+                    label = stringResource(id = R.string.today_delivered),
                     count = deliveredCount,
                     color = Color(0xFF2196F3)
                 )
@@ -198,14 +197,14 @@ private fun EmptyState(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "No entries for today",
+            text = stringResource(id = R.string.today_empty_title),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Tap the ➕ button to add a work entry",
+            text = stringResource(id = R.string.today_empty_subtitle),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
             textAlign = TextAlign.Center

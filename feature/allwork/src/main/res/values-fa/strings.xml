@@ -1,0 +1,10 @@
+<resources>
+    <string name="all_work_title">همه کارها</string>
+    <string name="filter_all">همه</string>
+    <string name="filter_in_progress">در حال انجام</string>
+    <string name="filter_completed">تکمیل‌شده</string>
+    <string name="filter_delivered">تحویل‌شده</string>
+    <string name="empty_all_work">هنوز هیچ کاری ثبت نشده</string>
+    <string name="qty_label">تعداد: %1$d</string>
+</resources>
+

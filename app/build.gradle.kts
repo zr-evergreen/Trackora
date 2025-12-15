@@ -82,6 +82,7 @@ dependencies {
     
     // Kotlinx Serialization
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.datastore.preferences)
     
     // Hilt
     implementation(libs.hilt.android)

@@ -1,0 +1,10 @@
+<resources>
+    <string name="today_title">Today</string>
+    <string name="today_date_format">EEEE, MMM d, yyyy</string>
+    <string name="today_empty_title">No entries for today</string>
+    <string name="today_empty_subtitle">Tap the ➕ button to add a work entry</string>
+    <string name="today_summary">Summary</string>
+    <string name="today_completed">Completed</string>
+    <string name="today_delivered">Delivered</string>
+    <string name="today_add_work_entry">Add Work Entry</string>
+</resources>

@@ -1,0 +1,15 @@
+<resources>
+    <string name="add_work_title">Add Work</string>
+    <string name="edit_work_title">Edit Work</string>
+    <string name="field_title_required">Title *</string>
+    <string name="field_quantity_optional">Quantity (optional)</string>
+    <string name="label_status">Status</string>
+    <string name="status_in_progress">In Progress</string>
+    <string name="status_completed">Completed</string>
+    <string name="status_delivered">Delivered</string>
+    <string name="label_date">Date: %1$s</string>
+    <string name="error_title_required">Title is required</string>
+    <string name="error_entry_not_found">Entry not found</string>
+    <string name="action_save">Save</string>
+    <string name="content_back">Back</string>
+</resources>

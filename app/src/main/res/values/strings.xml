@@ -1,3 +1,13 @@
 <resources>
     <string name="app_name">Trackora</string>
+    <string name="nav_today">Today</string>
+    <string name="nav_all_work">All Work</string>
+    <string name="nav_reports">Reports</string>
+    <string name="nav_settings">Settings</string>
+    <string name="content_add_work_entry">Add Work Entry</string>
+    <string name="settings_title">Settings</string>
+    <string name="settings_language">Language</string>
+    <string name="language_system_default">System default</string>
+    <string name="language_english">English</string>
+    <string name="language_persian">Persian (Farsi)</string>
 </resources>

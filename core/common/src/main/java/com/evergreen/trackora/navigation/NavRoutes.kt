@@ -19,3 +19,6 @@ object AllWorkRoute
 @Serializable
 object ReportsRoute
 
+@Serializable
+object SettingsRoute
+

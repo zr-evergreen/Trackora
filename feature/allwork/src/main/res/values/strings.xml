@@ -1,0 +1,10 @@
+<resources>
+    <string name="all_work_title">All Work</string>
+    <string name="filter_all">All</string>
+    <string name="filter_in_progress">In Progress</string>
+    <string name="filter_completed">Completed</string>
+    <string name="filter_delivered">Delivered</string>
+    <string name="empty_all_work">No work entries yet</string>
+    <string name="qty_label">Qty: %1$d</string>
+</resources>
+

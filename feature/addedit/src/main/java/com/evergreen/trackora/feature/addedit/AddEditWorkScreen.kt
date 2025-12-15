@@ -27,9 +27,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.evergreen.trackora.domain.model.Status
+import com.evergreen.trackora.feature.addedit.R
 import java.time.format.DateTimeFormatter
 
 /**
@@ -44,7 +46,11 @@ fun AddEditWorkScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val dateFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy")
-    val titleText = if (entryId == null) "Add Work" else "Edit Work"
+    val titleText = if (entryId == null) {
+        stringResource(id = R.string.add_work_title)
+    } else {
+        stringResource(id = R.string.edit_work_title)
+    }
 
     if (uiState.isSaved) {
         LaunchedEffect(Unit) {
@@ -60,7 +66,7 @@ fun AddEditWorkScreen(
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back"
+                            contentDescription = stringResource(id = R.string.content_back)
                         )
                     }
                 }
@@ -77,7 +83,7 @@ fun AddEditWorkScreen(
             OutlinedTextField(
                 value = uiState.title,
                 onValueChange = viewModel::onTitleChange,
-                label = { Text("Title *") },
+                label = { Text(stringResource(id = R.string.field_title_required)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 isError = uiState.title.isBlank() && !uiState.isLoading
@@ -86,13 +92,13 @@ fun AddEditWorkScreen(
             OutlinedTextField(
                 value = uiState.quantityInput,
                 onValueChange = viewModel::onQuantityChange,
-                label = { Text("Quantity (optional)") },
+                label = { Text(stringResource(id = R.string.field_quantity_optional)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
 
             Text(
-                text = "Status",
+                text = stringResource(id = R.string.label_status),
                 style = MaterialTheme.typography.labelLarge
             )
             StatusSelector(
@@ -101,7 +107,10 @@ fun AddEditWorkScreen(
             )
 
             Text(
-                text = "Date: ${uiState.date.format(dateFormatter)}",
+                text = stringResource(
+                    id = R.string.label_date,
+                    uiState.date.format(dateFormatter)
+                ),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -137,7 +146,7 @@ fun AddEditWorkScreen(
                     )
                 }
                 Spacer(modifier = Modifier.size(8.dp))
-                Text("Save")
+                Text(stringResource(id = R.string.action_save))
             }
         }
     }
@@ -158,9 +167,9 @@ private fun StatusSelector(
                 label = {
                     Text(
                         text = when (status) {
-                            Status.IN_PROGRESS -> "In Progress"
-                            Status.COMPLETED -> "Completed"
-                            Status.DELIVERED -> "Delivered"
+                            Status.IN_PROGRESS -> stringResource(id = R.string.status_in_progress)
+                            Status.COMPLETED -> stringResource(id = R.string.status_completed)
+                            Status.DELIVERED -> stringResource(id = R.string.status_delivered)
                         }
                     )
                 },

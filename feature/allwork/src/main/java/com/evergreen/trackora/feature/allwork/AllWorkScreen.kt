@@ -24,8 +24,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import com.evergreen.trackora.domain.model.Status
 import com.evergreen.trackora.domain.model.WorkEntry
+import com.evergreen.trackora.feature.allwork.R
 
 /**
  * Screen for viewing all work entries with quick status filters.
@@ -45,7 +47,7 @@ fun AllWorkScreen(
             .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
         Text(
-            text = "All Work",
+            text = stringResource(id = R.string.all_work_title),
             style = MaterialTheme.typography.titleLarge
         )
 
@@ -67,7 +69,7 @@ fun AllWorkScreen(
 
             uiState.filteredEntries.isEmpty() -> {
                 Text(
-                    text = "No work entries yet",
+                    text = stringResource(id = R.string.empty_all_work),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -98,10 +100,10 @@ private fun StatusFilterRow(
     onFilterSelected: (Status?) -> Unit
 ) {
     val filters: List<Pair<String, Status?>> = listOf(
-        "All" to null,
-        "In Progress" to Status.IN_PROGRESS,
-        "Completed" to Status.COMPLETED,
-        "Delivered" to Status.DELIVERED
+        stringResource(id = R.string.filter_all) to null,
+        stringResource(id = R.string.filter_in_progress) to Status.IN_PROGRESS,
+        stringResource(id = R.string.filter_completed) to Status.COMPLETED,
+        stringResource(id = R.string.filter_delivered) to Status.DELIVERED
     )
 
     androidx.compose.foundation.layout.Row(
@@ -146,16 +148,16 @@ private fun AllWorkListItem(
             )
             entry.quantity?.let {
                 Text(
-                    text = "Qty: $it",
+                    text = stringResource(id = R.string.qty_label, it),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Text(
                 text = when (entry.status) {
-                    Status.IN_PROGRESS -> "In Progress"
-                    Status.COMPLETED -> "Completed"
-                    Status.DELIVERED -> "Delivered"
+                    Status.IN_PROGRESS -> stringResource(id = R.string.filter_in_progress)
+                    Status.COMPLETED -> stringResource(id = R.string.filter_completed)
+                    Status.DELIVERED -> stringResource(id = R.string.filter_delivered)
                 },
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.primary
