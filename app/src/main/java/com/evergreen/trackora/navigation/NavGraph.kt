@@ -1,23 +1,19 @@
 package com.evergreen.trackora.navigation
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.BarChart
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Today
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -44,48 +40,48 @@ fun NavGraph(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     
-    // Show bottom nav only on main screens (not on AddEditWork)
-    val showBottomNav = currentDestination?.route?.let { route ->
-        route != AddEditWorkRoute().toString()
-    } ?: true
+    // Show bottom nav on primary tabs, FAB only on Today. Hide both on Add/Edit.
+    val currentRoute = currentDestination?.route.orEmpty()
+    val isAddEdit = currentRoute.contains("AddEditWorkRoute")
+    val showBottomNav = currentRoute.isEmpty() || (!isAddEdit)
+    val showFab = currentRoute.contains("TodayRoute")
     
     androidx.compose.material3.Scaffold(
-        topBar = {
-            if (showBottomNav) {
-                TopAppBar(
-                    title = { Text("Trackora") },
-                    actions = {
-                        IconButton(onClick = onSettingsClick) {
-                            Icon(
-                                imageVector = Icons.Default.Menu,
-                                contentDescription = "Settings"
-                            )
-                        }
-                    }
-                )
-            }
-        },
         bottomBar = {
             if (showBottomNav) {
                 BottomNavigationBar(navController = navController)
+            }
+        },
+        floatingActionButton = {
+            if (showFab) {
+                FloatingActionButton(
+                    onClick = { navController.navigate(AddEditWorkRoute()) }
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Add Work Entry"
+                    )
+                }
             }
         }
     ) { paddingValues ->
         NavHost(
             navController = navController,
-            startDestination = startDestination,
-            modifier = Modifier.padding(paddingValues)
+            startDestination = startDestination
         ) {
             // Feature navigation graphs
             todayNavigation(
-                onAddEntryClick = {
-                    navController.navigate(AddEditWorkRoute())
+                contentPadding = paddingValues
+            )
+            
+            allWorkNavigation(
+                contentPadding = paddingValues,
+                onEntryClick = { entryId ->
+                    navController.navigate(AddEditWorkRoute(entryId = entryId))
                 }
             )
             
-            allWorkNavigation()
-            
-            reportsNavigation()
+            reportsNavigation(contentPadding = paddingValues)
             
             // Add/Edit Work (modal screen)
             composable<AddEditWorkRoute> { backStackEntry ->

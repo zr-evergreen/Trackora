@@ -1,45 +1,165 @@
 package com.evergreen.trackora.feature.allwork
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Scaffold
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.evergreen.trackora.domain.model.Status
+import com.evergreen.trackora.domain.model.WorkEntry
 
 /**
- * Screen for viewing all work entries.
- * TODO: Implement the list of all work entries
+ * Screen for viewing all work entries with quick status filters.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AllWorkScreen(
-    onNavigateBack: () -> Unit
+    contentPadding: androidx.compose.foundation.layout.PaddingValues,
+    onEntryClick: (Long) -> Unit,
+    viewModel: AllWorkViewModel
 ) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(text = "All Work Entries")
+    val uiState by viewModel.uiState.collectAsState()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(contentPadding)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Text(
+            text = "All Work",
+            style = MaterialTheme.typography.titleLarge
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        StatusFilterRow(
+            selected = uiState.filter,
+            onFilterSelected = viewModel::setFilter
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        when {
+            uiState.isLoading -> {
+                CircularProgressIndicator(
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                )
+            }
+
+            uiState.filteredEntries.isEmpty() -> {
+                Text(
+                    text = "No work entries yet",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            else -> {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(
+                        items = uiState.filteredEntries,
+                        key = { it.id }
+                    ) { entry ->
+                        AllWorkListItem(
+                            entry = entry,
+                            onClick = { onEntryClick(entry.id) }
+                        )
+                    }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatusFilterRow(
+    selected: Status?,
+    onFilterSelected: (Status?) -> Unit
+) {
+    val filters: List<Pair<String, Status?>> = listOf(
+        "All" to null,
+        "In Progress" to Status.IN_PROGRESS,
+        "Completed" to Status.COMPLETED,
+        "Delivered" to Status.DELIVERED
+    )
+
+    androidx.compose.foundation.layout.Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        filters.forEach { (label, status) ->
+            FilterChip(
+                selected = selected == status,
+                onClick = { onFilterSelected(status) },
+                label = { Text(label) },
+                colors = FilterChipDefaults.filterChipColors()
             )
         }
-    ) { paddingValues ->
+    }
+}
+
+@Composable
+private fun AllWorkListItem(
+    entry: WorkEntry,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        onClick = onClick
+    ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
+                .fillMaxWidth()
                 .padding(16.dp)
         ) {
             Text(
-                text = "All Work Entries Screen",
-                modifier = Modifier.padding(16.dp)
+                text = entry.title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
-            // TODO: Implement list of all work entries
+            entry.quantity?.let {
+                Text(
+                    text = "Qty: $it",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Text(
+                text = when (entry.status) {
+                    Status.IN_PROGRESS -> "In Progress"
+                    Status.COMPLETED -> "Completed"
+                    Status.DELIVERED -> "Delivered"
+                },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
         }
     }
 }

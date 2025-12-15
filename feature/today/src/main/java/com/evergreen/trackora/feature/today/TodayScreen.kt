@@ -1,7 +1,6 @@
 package com.evergreen.trackora.feature.today
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,18 +10,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -40,102 +32,85 @@ import com.evergreen.trackora.ui.theme.TrackoraTheme
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
+import androidx.compose.foundation.layout.PaddingValues
 
 /**
  * Today screen - the heart of the app.
  * Shows today's date, summary, and list of work entries.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TodayScreen(
     viewModel: TodayViewModel = hiltViewModel(),
-    onAddEntryClick: () -> Unit = {}
+    contentPadding: PaddingValues = PaddingValues()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val today = LocalDate.now()
     val dateFormatter = DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL)
     
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = "Today",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = today.format(dateFormatter),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(contentPadding)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = "Today",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
             )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = onAddEntryClick,
-                containerColor = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(16.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Add Work Entry",
-                    modifier = Modifier.padding(8.dp)
+            Text(
+                text = today.format(dateFormatter),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        when {
+            uiState.isLoading -> {
+                CircularProgressIndicator(
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
                 )
             }
-        }
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            when {
-                uiState.isLoading -> {
-                    CircularProgressIndicator(
-                        modifier = Modifier.align(Alignment.Center)
-                    )
-                }
-                
-                uiState.isEmpty -> {
-                    EmptyState(
-                        modifier = Modifier.align(Alignment.Center)
-                    )
-                }
-                
-                else -> {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                            horizontal = 16.dp,
-                            vertical = 8.dp
+            
+            uiState.isEmpty -> {
+                EmptyState(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 32.dp)
+                )
+            }
+            
+            else -> {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(vertical = 8.dp)
+                ) {
+                    // Summary Card
+                    item {
+                        SummaryCard(
+                            completedCount = uiState.completedCount,
+                            deliveredCount = uiState.deliveredCount,
+                            modifier = Modifier.fillMaxWidth()
                         )
-                    ) {
-                        // Summary Card
-                        item {
-                            SummaryCard(
-                                completedCount = uiState.completedCount,
-                                deliveredCount = uiState.deliveredCount,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                        }
-                        
-                        // Work Entries List
-                        items(
-                            items = uiState.todayEntries,
-                            key = { it.id }
-                        ) { entry ->
-                            WorkEntryItem(
-                                entry = entry,
-                                onStatusClick = { newStatus ->
-                                    viewModel.updateEntryStatus(entry.id, newStatus)
-                                }
-                            )
-                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+                    
+                    // Work Entries List
+                    items(
+                        items = uiState.todayEntries,
+                        key = { it.id }
+                    ) { entry ->
+                        WorkEntryItem(
+                            entry = entry,
+                            onStatusClick = { newStatus ->
+                                viewModel.updateEntryStatus(entry.id, newStatus)
+                            }
+                        )
                     }
                 }
             }

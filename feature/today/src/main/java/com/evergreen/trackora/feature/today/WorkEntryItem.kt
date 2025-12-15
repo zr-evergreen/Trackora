@@ -1,6 +1,7 @@
 package com.evergreen.trackora.feature.today
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -34,12 +35,17 @@ import java.time.LocalDate
 fun WorkEntryItem(
     entry: WorkEntry,
     onStatusClick: (Status) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    showStatusSelector: Boolean = true
 ) {
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .then(
+                if (onClick != null) Modifier.clickable { onClick() } else Modifier
+            ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
@@ -92,11 +98,12 @@ fun WorkEntryItem(
                 }
             }
             
-            // Status selector
-            StatusSelector(
-                currentStatus = entry.status,
-                onStatusSelected = onStatusClick
-            )
+            if (showStatusSelector) {
+                StatusSelector(
+                    currentStatus = entry.status,
+                    onStatusSelected = onStatusClick
+                )
+            }
         }
     }
 }

@@ -4,17 +4,18 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.evergreen.trackora.navigation.TodayRoute
+import androidx.compose.foundation.layout.PaddingValues
 
 /**
  * Navigation graph for Today feature.
  */
 fun NavGraphBuilder.todayNavigation(
-    onAddEntryClick: () -> Unit
+    contentPadding: PaddingValues
 ) {
     composable<TodayRoute> {
         TodayScreen(
             viewModel = hiltViewModel(),
-            onAddEntryClick = onAddEntryClick
+            contentPadding = contentPadding
         )
     }
 }
