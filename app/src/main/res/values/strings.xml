@@ -14,4 +14,23 @@
     <string name="theme_system_default">System default</string>
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
+
+    <!-- Settings sections -->
+    <string name="settings_section_appearance">Appearance</string>
+    <string name="settings_section_appearance_desc">Choose how the app looks and which language it uses.</string>
+
+    <string name="settings_section_work_fields">Work fields</string>
+    <string name="settings_section_work_fields_desc">Rename the extra fields that appear when you add new work.</string>
+    <string name="settings_custom_field_1">Custom field 1 name</string>
+    <string name="settings_custom_field_2">Custom field 2 name</string>
+    <string name="settings_custom_field_3">Custom field 3 name</string>
+
+    <string name="settings_section_data">Data</string>
+    <string name="settings_section_data_desc">Create a copy of your work data that you can open in other tools.</string>
+    <string name="settings_export_data_label">Export work data (CSV or JSON)</string>
+
+    <string name="settings_section_about">About</string>
+    <string name="settings_section_about_desc">Basic information about this app.</string>
+    <string name="settings_about_version_label">Version</string>
+
 </resources>

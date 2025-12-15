@@ -88,7 +88,9 @@ fun NavGraph(
             reportsNavigation(contentPadding = paddingValues)
 
             composable<SettingsRoute> {
-                SettingsScreen()
+                SettingsScreen(
+                    contentPadding = paddingValues
+                )
             }
             
             // Add/Edit Work (modal screen)

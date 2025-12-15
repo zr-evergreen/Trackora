@@ -14,4 +14,23 @@
     <string name="theme_system_default">مطابق دستگاه</string>
     <string name="theme_light">روشن</string>
     <string name="theme_dark">تیره</string>
+
+    <!-- Settings sections (Farsi) -->
+    <string name="settings_section_appearance">نمای ظاهری</string>
+    <string name="settings_section_appearance_desc">نمای برنامه و زبان نمایش متن‌ها را تنظیم کنید.</string>
+
+    <string name="settings_section_work_fields">فیلدهای کار</string>
+    <string name="settings_section_work_fields_desc">نام فیلدهای اضافه‌ای را که در «افزودن کار» می‌بینید تغییر دهید.</string>
+    <string name="settings_custom_field_1">نام فیلد سفارشی ۱</string>
+    <string name="settings_custom_field_2">نام فیلد سفارشی ۲</string>
+    <string name="settings_custom_field_3">نام فیلد سفارشی ۳</string>
+
+    <string name="settings_section_data">داده‌ها</string>
+    <string name="settings_section_data_desc">یک نسخه از داده‌های کار خود برای استفاده در ابزارهای دیگر بسازید.</string>
+    <string name="settings_export_data_label">خروجی گرفتن داده‌های کار (CSV یا JSON)</string>
+
+    <string name="settings_section_about">درباره برنامه</string>
+    <string name="settings_section_about_desc">اطلاعات کلی درباره این برنامه.</string>
+    <string name="settings_about_version_label">نسخه برنامه</string>
+
 </resources>
