@@ -76,8 +76,7 @@ fun TrackoraTheme(
         SideEffect {
             val window = (view.context as Activity).window
             @Suppress("DEPRECATION")
-            window.statusBarColor = colorScheme.primary.toArgb()
-            // Light status bar icons when background is light, dark icons when background is dark.
+            window.statusBarColor = colorScheme.background.toArgb()
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
         }
     }
