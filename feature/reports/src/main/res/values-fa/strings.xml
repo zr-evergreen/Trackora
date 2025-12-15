@@ -1,0 +1,11 @@
+<resources>
+    <string name="reports_title">گزارش‌ها</string>
+    <string name="reports_daily">روزانه</string>
+    <string name="reports_weekly">هفتگی</string>
+    <string name="reports_monthly">ماهانه</string>
+    <string name="reports_completed">تکمیل‌شده</string>
+    <string name="reports_delivered">تحویل‌شده</string>
+    <string name="reports_quantity">تعداد کل</string>
+</resources>
+
+

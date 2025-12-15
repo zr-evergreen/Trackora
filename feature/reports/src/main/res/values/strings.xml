@@ -1,0 +1,11 @@
+<resources>
+    <string name="reports_title">Reports</string>
+    <string name="reports_daily">Daily</string>
+    <string name="reports_weekly">Weekly</string>
+    <string name="reports_monthly">Monthly</string>
+    <string name="reports_completed">Completed</string>
+    <string name="reports_delivered">Delivered</string>
+    <string name="reports_quantity">Total quantity</string>
+</resources>
+
+
