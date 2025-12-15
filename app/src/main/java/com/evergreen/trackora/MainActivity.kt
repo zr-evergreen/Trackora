@@ -1,7 +1,7 @@
 package com.evergreen.trackora
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.lifecycleScope
@@ -22,7 +22,7 @@ import kotlinx.coroutines.launch
  * Main activity for the Trackora application.
  */
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
 
     @Inject lateinit var localeManager: LocaleManager
 
