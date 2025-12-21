@@ -14,6 +14,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -33,26 +37,18 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.CalendarToday
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.evergreen.trackora.domain.model.Status
-import com.evergreen.trackora.feature.addedit.R
 import com.evergreen.trackora.ui.components.JalaliDatePickerDialog
 import com.evergreen.trackora.util.JalaliCalendar
 import com.evergreen.trackora.util.JalaliCalendar.JalaliDate
@@ -60,7 +56,6 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 /**
  * Screen for adding or editing work entries.
@@ -76,20 +71,20 @@ fun AddEditWorkScreen(
     val configuration = LocalConfiguration.current
     val currentLocale = configuration.locales[0]
     val isPersian = currentLocale.language == "fa"
-    
+
     val dateFormatter = if (isPersian) {
         // Will use Jalali formatting
         null
     } else {
         DateTimeFormatter.ofPattern("MMM d, yyyy")
     }
-    
+
     val titleText = if (entryId == null) {
         stringResource(id = R.string.add_work_title)
     } else {
         stringResource(id = R.string.edit_work_title)
     }
-    
+
     // Get Jalali date for display if Persian
     val jalaliDate = if (isPersian) {
         JalaliCalendar.gregorianToJalali(uiState.date)
@@ -210,6 +205,60 @@ fun AddEditWorkScreen(
                 )
             )
 
+            // Custom Fields - only show if names are defined in settings
+            val customFieldNames by viewModel.customFieldNames.collectAsState(
+                initial = Triple(
+                    "",
+                    "",
+                    ""
+                )
+            )
+
+            if (customFieldNames.first.isNotBlank()) {
+                OutlinedTextField(
+                    value = uiState.customField1,
+                    onValueChange = viewModel::onCustomField1Change,
+                    label = { Text(customFieldNames.first) },
+                    placeholder = { Text(stringResource(id = R.string.placeholder_custom_field)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                    )
+                )
+            }
+
+            if (customFieldNames.second.isNotBlank()) {
+                OutlinedTextField(
+                    value = uiState.customField2,
+                    onValueChange = viewModel::onCustomField2Change,
+                    label = { Text(customFieldNames.second) },
+                    placeholder = { Text(stringResource(id = R.string.placeholder_custom_field)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                    )
+                )
+            }
+
+            if (customFieldNames.third.isNotBlank()) {
+                OutlinedTextField(
+                    value = uiState.customField3,
+                    onValueChange = viewModel::onCustomField3Change,
+                    label = { Text(customFieldNames.third) },
+                    placeholder = { Text(stringResource(id = R.string.placeholder_custom_field)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                    )
+                )
+            }
+
             // Status Section
             Text(
                 text = stringResource(id = R.string.label_status),
@@ -303,7 +352,7 @@ fun AddEditWorkScreen(
                         .toInstant()
                         .toEpochMilli()
                 )
-                
+
                 DatePickerDialog(
                     onDismissRequest = { viewModel.dismissDatePicker() },
                     confirmButton = {

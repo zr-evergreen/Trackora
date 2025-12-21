@@ -3,6 +3,8 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.hilt)
+    alias(libs.plugins.kotlin.kapt)
 }
 
 android {
@@ -50,6 +52,16 @@ dependencies {
     
     // Kotlinx Serialization
     implementation(libs.kotlinx.serialization.json)
+    
+    // DataStore
+    implementation(libs.datastore.preferences)
+    
+    // Hilt
+    implementation(libs.hilt.android)
+    kapt(libs.hilt.compiler)
+    
+    // Coroutines (for Flow)
+    implementation(libs.kotlinx.coroutines.core)
     
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

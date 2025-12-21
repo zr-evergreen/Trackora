@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import com.evergreen.trackora.locale.LocaleManager
+import com.evergreen.trackora.theme.ThemeManager
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -14,6 +15,7 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 private const val LOCALE_DATASTORE_NAME = "locale_prefs"
+private const val THEME_DATASTORE_NAME = "theme_prefs"
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -21,6 +23,7 @@ object LocaleModule {
 
     @Provides
     @Singleton
+    @LocaleDataStore
     fun provideLocaleDataStore(
         @ApplicationContext context: Context
     ): DataStore<Preferences> {
@@ -32,7 +35,29 @@ object LocaleModule {
     @Provides
     @Singleton
     fun provideLocaleManager(
-        dataStore: DataStore<Preferences>
+        @LocaleDataStore dataStore: DataStore<Preferences>
     ): LocaleManager = LocaleManager(dataStore)
+}
+
+@Module
+@InstallIn(SingletonComponent::class)
+object ThemeModule {
+
+    @Provides
+    @Singleton
+    @ThemeDataStore
+    fun provideThemeDataStore(
+        @ApplicationContext context: Context
+    ): DataStore<Preferences> {
+        return PreferenceDataStoreFactory.create {
+            context.preferencesDataStoreFile(THEME_DATASTORE_NAME)
+        }
+    }
+
+    @Provides
+    @Singleton
+    fun provideThemeManager(
+        @ThemeDataStore dataStore: DataStore<Preferences>
+    ): ThemeManager = ThemeManager(dataStore)
 }
 

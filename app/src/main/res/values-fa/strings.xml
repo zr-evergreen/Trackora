@@ -22,8 +22,12 @@
     <string name="settings_section_work_fields">فیلدهای کار</string>
     <string name="settings_section_work_fields_desc">نام فیلدهای اضافه‌ای را که در «افزودن کار» می‌بینید تغییر دهید.</string>
     <string name="settings_custom_field_1">نام فیلد سفارشی ۱</string>
+    <string name="settings_custom_field_1_placeholder">مثال: نام مشتری</string>
     <string name="settings_custom_field_2">نام فیلد سفارشی ۲</string>
+    <string name="settings_custom_field_2_placeholder">مثال: کد پروژه</string>
     <string name="settings_custom_field_3">نام فیلد سفارشی ۳</string>
+    <string name="settings_custom_field_3_placeholder">مثال: یادداشت</string>
+    <string name="settings_custom_field_hint">خالی بگذارید تا این فیلد مخفی شود</string>
 
     <string name="settings_section_data">داده‌ها</string>
     <string name="settings_section_data_desc">یک نسخه از داده‌های کار خود برای استفاده در ابزارهای دیگر بسازید.</string>

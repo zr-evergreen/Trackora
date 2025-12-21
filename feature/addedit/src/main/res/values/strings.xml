@@ -32,6 +32,9 @@
     <string name="content_back">Back</string>
     <string name="content_select_date">Select date</string>
     
+    <!-- Placeholders -->
+    <string name="placeholder_custom_field">Enter value</string>
+    
     <!-- Errors -->
     <string name="error_title_required">Title is required</string>
     <string name="error_entry_not_found">Entry not found</string>

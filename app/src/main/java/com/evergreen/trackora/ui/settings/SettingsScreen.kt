@@ -21,6 +21,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.evergreen.trackora.R
 import com.evergreen.trackora.locale.AppLocale
+import com.evergreen.trackora.settings.CustomFields
 import com.evergreen.trackora.theme.AppThemeMode
 
 @Composable
@@ -49,6 +51,7 @@ fun SettingsScreen(
         uiState = uiState,
         onLocaleSelected = viewModel::onLocaleSelected,
         onThemeSelected = viewModel::onThemeSelected,
+        onCustomFieldsChanged = viewModel::onCustomFieldsChanged,
         onExportDataClick = onExportDataClick,
         contentPadding = contentPadding
     )
@@ -59,14 +62,23 @@ private fun SettingsScreenContent(
     uiState: SettingsUiState,
     onLocaleSelected: (AppLocale) -> Unit,
     onThemeSelected: (AppThemeMode) -> Unit,
+    onCustomFieldsChanged: (CustomFields) -> Unit,
     onExportDataClick: () -> Unit,
     contentPadding: PaddingValues
 ) {
     val scrollState = rememberScrollState()
 
-    var customField1 by rememberSaveable { mutableStateOf("") }
-    var customField2 by rememberSaveable { mutableStateOf("") }
-    var customField3 by rememberSaveable { mutableStateOf("") }
+    // Initialize custom fields from state
+    var customField1 by rememberSaveable { mutableStateOf(uiState.customFields.field1Name) }
+    var customField2 by rememberSaveable { mutableStateOf(uiState.customFields.field2Name) }
+    var customField3 by rememberSaveable { mutableStateOf(uiState.customFields.field3Name) }
+    
+    // Update local state when UI state changes
+    LaunchedEffect(uiState.customFields) {
+        customField1 = uiState.customFields.field1Name
+        customField2 = uiState.customFields.field2Name
+        customField3 = uiState.customFields.field3Name
+    }
 
     Column(
         modifier = Modifier
@@ -142,32 +154,89 @@ private fun SettingsScreenContent(
         ) {
             OutlinedTextField(
                 value = customField1,
-                onValueChange = { customField1 = it },
+                onValueChange = { 
+                    customField1 = it
+                    onCustomFieldsChanged(
+                        CustomFields(
+                            field1Name = it,
+                            field2Name = customField2,
+                            field3Name = customField3
+                        )
+                    )
+                },
                 label = {
                     Text(text = stringResource(id = R.string.settings_custom_field_1))
                 },
+                placeholder = {
+                    Text(text = stringResource(id = R.string.settings_custom_field_1_placeholder))
+                },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                supportingText = {
+                    Text(
+                        text = stringResource(id = R.string.settings_custom_field_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             )
             Spacer(modifier = Modifier.height(12.dp))
             OutlinedTextField(
                 value = customField2,
-                onValueChange = { customField2 = it },
+                onValueChange = { 
+                    customField2 = it
+                    onCustomFieldsChanged(
+                        CustomFields(
+                            field1Name = customField1,
+                            field2Name = it,
+                            field3Name = customField3
+                        )
+                    )
+                },
                 label = {
                     Text(text = stringResource(id = R.string.settings_custom_field_2))
                 },
+                placeholder = {
+                    Text(text = stringResource(id = R.string.settings_custom_field_2_placeholder))
+                },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                supportingText = {
+                    Text(
+                        text = stringResource(id = R.string.settings_custom_field_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             )
             Spacer(modifier = Modifier.height(12.dp))
             OutlinedTextField(
                 value = customField3,
-                onValueChange = { customField3 = it },
+                onValueChange = { 
+                    customField3 = it
+                    onCustomFieldsChanged(
+                        CustomFields(
+                            field1Name = customField1,
+                            field2Name = customField2,
+                            field3Name = it
+                        )
+                    )
+                },
                 label = {
                     Text(text = stringResource(id = R.string.settings_custom_field_3))
                 },
+                placeholder = {
+                    Text(text = stringResource(id = R.string.settings_custom_field_3_placeholder))
+                },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                supportingText = {
+                    Text(
+                        text = stringResource(id = R.string.settings_custom_field_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             )
         }
 

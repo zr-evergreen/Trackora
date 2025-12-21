@@ -10,6 +10,9 @@ data class AddEditWorkUiState(
     val title: String = "",
     val description: String = "",
     val quantityInput: String = "",
+    val customField1: String = "",
+    val customField2: String = "",
+    val customField3: String = "",
     val status: Status = Status.IN_PROGRESS,
     val date: LocalDate = LocalDate.now(),
     val showDatePicker: Boolean = false,
@@ -24,7 +27,8 @@ data class AddEditWorkUiState(
         get() = title.isNotBlank() && titleError == null && quantityError == null
     
     val hasChanges: Boolean
-        get() = title.isNotBlank() || description.isNotBlank() || quantityInput.isNotBlank()
+        get() = title.isNotBlank() || description.isNotBlank() || quantityInput.isNotBlank() ||
+                customField1.isNotBlank() || customField2.isNotBlank() || customField3.isNotBlank()
 }
 
 

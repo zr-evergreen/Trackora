@@ -22,8 +22,12 @@
     <string name="settings_section_work_fields">Work fields</string>
     <string name="settings_section_work_fields_desc">Rename the extra fields that appear when you add new work.</string>
     <string name="settings_custom_field_1">Custom field 1 name</string>
+    <string name="settings_custom_field_1_placeholder">e.g., Client Name</string>
     <string name="settings_custom_field_2">Custom field 2 name</string>
+    <string name="settings_custom_field_2_placeholder">e.g., Project Code</string>
     <string name="settings_custom_field_3">Custom field 3 name</string>
+    <string name="settings_custom_field_3_placeholder">e.g., Notes</string>
+    <string name="settings_custom_field_hint">Leave empty to hide this field</string>
 
     <string name="settings_section_data">Data</string>
     <string name="settings_section_data_desc">Create a copy of your work data that you can open in other tools.</string>

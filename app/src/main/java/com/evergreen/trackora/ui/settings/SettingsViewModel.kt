@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.evergreen.trackora.locale.AppLocale
 import com.evergreen.trackora.locale.LocaleManager
+import com.evergreen.trackora.settings.CustomFields
+import com.evergreen.trackora.settings.CustomFieldsManager
 import com.evergreen.trackora.theme.AppThemeMode
 import com.evergreen.trackora.theme.ThemeManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -16,22 +18,26 @@ import javax.inject.Inject
 
 data class SettingsUiState(
     val selectedLocale: AppLocale = AppLocale.SYSTEM,
-    val selectedTheme: AppThemeMode = AppThemeMode.SYSTEM
+    val selectedTheme: AppThemeMode = AppThemeMode.SYSTEM,
+    val customFields: CustomFields = CustomFields()
 )
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val localeManager: LocaleManager,
-    private val themeManager: ThemeManager
+    private val themeManager: ThemeManager,
+    private val customFieldsManager: CustomFieldsManager
 ) : ViewModel() {
 
     val uiState: StateFlow<SettingsUiState> = combine(
         localeManager.localeFlow,
-        themeManager.themeFlow
-    ) { locale, theme ->
+        themeManager.themeFlow,
+        customFieldsManager.allCustomFields
+    ) { locale, theme, customFields ->
         SettingsUiState(
             selectedLocale = locale,
-            selectedTheme = theme
+            selectedTheme = theme,
+            customFields = customFields
         )
     }.stateIn(
         scope = viewModelScope,
@@ -48,6 +54,12 @@ class SettingsViewModel @Inject constructor(
     fun onThemeSelected(mode: AppThemeMode) {
         viewModelScope.launch {
             themeManager.setTheme(mode)
+        }
+    }
+
+    fun onCustomFieldsChanged(customFields: CustomFields) {
+        viewModelScope.launch {
+            customFieldsManager.setCustomFields(customFields)
         }
     }
 }
