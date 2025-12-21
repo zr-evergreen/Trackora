@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
@@ -31,13 +32,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.evergreen.trackora.R
 import com.evergreen.trackora.locale.AppLocale
 import com.evergreen.trackora.settings.CustomFields
 import com.evergreen.trackora.theme.AppThemeMode
+import com.evergreen.trackora.util.AppVersion
 
 @Composable
 fun SettingsScreen(
@@ -72,7 +74,7 @@ private fun SettingsScreenContent(
     var customField1 by rememberSaveable { mutableStateOf(uiState.customFields.field1Name) }
     var customField2 by rememberSaveable { mutableStateOf(uiState.customFields.field2Name) }
     var customField3 by rememberSaveable { mutableStateOf(uiState.customFields.field3Name) }
-    
+
     // Update local state when UI state changes
     LaunchedEffect(uiState.customFields) {
         customField1 = uiState.customFields.field1Name
@@ -154,7 +156,7 @@ private fun SettingsScreenContent(
         ) {
             OutlinedTextField(
                 value = customField1,
-                onValueChange = { 
+                onValueChange = {
                     customField1 = it
                     onCustomFieldsChanged(
                         CustomFields(
@@ -183,7 +185,7 @@ private fun SettingsScreenContent(
             Spacer(modifier = Modifier.height(12.dp))
             OutlinedTextField(
                 value = customField2,
-                onValueChange = { 
+                onValueChange = {
                     customField2 = it
                     onCustomFieldsChanged(
                         CustomFields(
@@ -212,7 +214,7 @@ private fun SettingsScreenContent(
             Spacer(modifier = Modifier.height(12.dp))
             OutlinedTextField(
                 value = customField3,
-                onValueChange = { 
+                onValueChange = {
                     customField3 = it
                     onCustomFieldsChanged(
                         CustomFields(
@@ -266,13 +268,23 @@ private fun SettingsScreenContent(
                 style = MaterialTheme.typography.titleMedium
             )
             Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = stringResource(id = R.string.settings_about_version_label),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(id = R.string.settings_about_version_label),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = AppVersion.displayVersion,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
     }
 }

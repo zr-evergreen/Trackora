@@ -1,3 +1,5 @@
+import java.util.regex.Pattern
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -6,6 +8,25 @@ plugins {
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlin.serialization)
 }
+
+// Extract version constants from AppVersion.kt using regex (more reliable)
+val versionFile = file("${projectDir}/src/main/java/com/evergreen/trackora/util/AppVersion.kt")
+val versionFileContent = versionFile.readText()
+
+fun extractVersionConstant(name: String): Int {
+    val pattern = Pattern.compile("const val $name = (\\d+)")
+    val matcher = pattern.matcher(versionFileContent)
+    return if (matcher.find()) {
+        matcher.group(1).toInt()
+    } else {
+        throw GradleException("Could not find $name constant in AppVersion.kt")
+    }
+}
+
+val versionMajor = extractVersionConstant("VERSION_MAJOR")
+val versionMinor = extractVersionConstant("VERSION_MINOR")
+val versionPatch = extractVersionConstant("VERSION_PATCH")
+val versionBuild = extractVersionConstant("VERSION_BUILD")
 
 android {
     namespace = "com.evergreen.trackora"
@@ -17,8 +38,13 @@ android {
         applicationId = "com.evergreen.trackora"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+
+        // Semantic versioning components from AppVersion.kt (single source of truth)
+        // Construct version name: MAJOR.MINOR.PATCH
+        versionName = "$versionMajor.$versionMinor.$versionPatch"
+
+        // Version code: Increment for each release (uses VERSION_BUILD from AppVersion)
+        versionCode = versionBuild
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -41,6 +67,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -53,11 +80,11 @@ dependencies {
     implementation(project(":feature:addedit"))
     implementation(project(":feature:allwork"))
     implementation(project(":feature:reports"))
-    
+
     // AndroidX
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
-    
+
     // Compose BOM
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
@@ -68,27 +95,27 @@ dependencies {
     implementation(libs.compose.viewmodel)
     implementation(libs.compose.runtime.livedata)
     debugImplementation(libs.compose.ui.tooling)
-    
+
     // Lifecycle
     implementation(libs.lifecycle.runtime.ktx)
     implementation(libs.lifecycle.viewmodel.ktx)
-    
+
     // Coroutines
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
-    
+
     // Navigation
     implementation(libs.navigation.compose)
-    
+
     // Kotlinx Serialization
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.datastore.preferences)
-    
+
     // Hilt
     implementation(libs.hilt.android)
     kapt(libs.hilt.compiler)
     implementation(libs.hilt.navigation.compose)
-    
+
     // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
