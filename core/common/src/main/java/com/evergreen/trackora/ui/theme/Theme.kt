@@ -35,7 +35,14 @@ val DarkColorScheme = darkColorScheme(
     onBackground = OnBackgroundDark,
     surface = SurfaceDark,
     onSurface = OnSurfaceDark,
-    outline = OutlineDark
+    surfaceVariant = SurfaceVariantDark,
+    onSurfaceVariant = OnSurfaceVariantDark,
+    outline = OutlineDark,
+    outlineVariant = OutlineVariantDark,
+    error = ErrorDark,
+    onError = OnErrorDark,
+    errorContainer = ErrorContainerDark,
+    onErrorContainer = OnErrorContainerDark
 )
 
 val LightColorScheme = lightColorScheme(
@@ -55,14 +62,24 @@ val LightColorScheme = lightColorScheme(
     onBackground = OnBackgroundLight,
     surface = SurfaceLight,
     onSurface = OnSurfaceLight,
-    outline = OutlineLight
+    surfaceVariant = SurfaceVariantLight,
+    onSurfaceVariant = OnSurfaceVariantLight,
+    outline = OutlineLight,
+    outlineVariant = OutlineVariantLight,
+    error = ErrorLight,
+    onError = OnErrorLight,
+    errorContainer = ErrorContainerLight,
+    onErrorContainer = OnErrorContainerLight
 )
 
-// Medium rounded corners, consistent across components.
-private val WorkStatisticsShapes = Shapes(
-    small = RoundedCornerShape(8.dp),
-    medium = RoundedCornerShape(16.dp),
-    large = RoundedCornerShape(24.dp)
+// Modern, friendly rounded corners for a professional yet approachable feel.
+// Consistent shape system across all components for visual harmony.
+private val TrackoraShapes = Shapes(
+    extraSmall = RoundedCornerShape(4.dp),   // Small badges, chips
+    small = RoundedCornerShape(8.dp),       // Buttons, small cards
+    medium = RoundedCornerShape(12.dp),     // Standard cards, dialogs
+    large = RoundedCornerShape(16.dp),      // Large cards, sheets
+    extraLarge = RoundedCornerShape(28.dp)  // Bottom sheets, modals
 )
 
 @Composable
@@ -84,7 +101,7 @@ fun TrackoraTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
-        shapes = WorkStatisticsShapes,
+        shapes = TrackoraShapes,
         content = content
     )
 }

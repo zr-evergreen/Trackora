@@ -2,20 +2,19 @@ package com.evergreen.trackora.navigation
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Assignment
-import androidx.compose.material.icons.filled.BarChart
-import androidx.compose.material.icons.filled.Today
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -59,7 +58,9 @@ fun NavGraph(
         floatingActionButton = {
             if (showFab) {
                 FloatingActionButton(
-                    onClick = { navController.navigate(AddEditWorkRoute()) }
+                    onClick = { navController.navigate(AddEditWorkRoute()) },
+                    containerColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                    contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onPrimary
                 ) {
                     Icon(
                         imageVector = Icons.Default.Add,
@@ -114,10 +115,23 @@ private fun BottomNavigationBar(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     
-    NavigationBar {
+    NavigationBar(
+        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface,
+        tonalElevation = 8.dp
+    ) {
         NavigationBarItem(
-            icon = { Icon(Icons.Default.Today, contentDescription = stringResource(id = R.string.nav_today)) },
-            label = { Text(stringResource(id = R.string.nav_today)) },
+            icon = { 
+                Icon(
+                    painterResource(id = R.drawable.ic_today), 
+                    contentDescription = stringResource(id = R.string.nav_today)
+                ) 
+            },
+            label = { 
+                Text(
+                    text = stringResource(id = R.string.nav_today),
+                    style = androidx.compose.material3.MaterialTheme.typography.labelMedium
+                ) 
+            },
             selected = currentDestination?.hierarchy?.any { 
                 it.route?.contains("TodayRoute") == true 
             } == true,
@@ -129,11 +143,28 @@ private fun BottomNavigationBar(
                     launchSingleTop = true
                     restoreState = true
                 }
-            }
+            },
+            colors = androidx.compose.material3.NavigationBarItemDefaults.colors(
+                selectedIconColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                selectedTextColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                indicatorColor = androidx.compose.material3.MaterialTheme.colorScheme.primaryContainer,
+                unselectedIconColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                unselectedTextColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+            )
         )
         NavigationBarItem(
-            icon = { Icon(Icons.Default.Assignment, contentDescription = stringResource(id = R.string.nav_all_work)) },
-            label = { Text(stringResource(id = R.string.nav_all_work)) },
+            icon = { 
+                Icon(
+                    painterResource(id = R.drawable.ic_all_works), 
+                    contentDescription = stringResource(id = R.string.nav_all_work)
+                ) 
+            },
+            label = { 
+                Text(
+                    text = stringResource(id = R.string.nav_all_work),
+                    style = androidx.compose.material3.MaterialTheme.typography.labelMedium
+                ) 
+            },
             selected = currentDestination?.hierarchy?.any { 
                 it.route?.contains("AllWorkRoute") == true 
             } == true,
@@ -145,11 +176,28 @@ private fun BottomNavigationBar(
                     launchSingleTop = true
                     restoreState = true
                 }
-            }
+            },
+            colors = androidx.compose.material3.NavigationBarItemDefaults.colors(
+                selectedIconColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                selectedTextColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                indicatorColor = androidx.compose.material3.MaterialTheme.colorScheme.primaryContainer,
+                unselectedIconColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                unselectedTextColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+            )
         )
         NavigationBarItem(
-            icon = { Icon(Icons.Default.BarChart, contentDescription = stringResource(id = R.string.nav_reports)) },
-            label = { Text(stringResource(id = R.string.nav_reports)) },
+            icon = { 
+                Icon(
+                    painterResource(id = R.drawable.ic_reports), 
+                    contentDescription = stringResource(id = R.string.nav_reports)
+                ) 
+            },
+            label = { 
+                Text(
+                    text = stringResource(id = R.string.nav_reports),
+                    style = androidx.compose.material3.MaterialTheme.typography.labelMedium
+                ) 
+            },
             selected = currentDestination?.hierarchy?.any { 
                 it.route?.contains("ReportsRoute") == true 
             } == true,
@@ -161,11 +209,28 @@ private fun BottomNavigationBar(
                     launchSingleTop = true
                     restoreState = true
                 }
-            }
+            },
+            colors = androidx.compose.material3.NavigationBarItemDefaults.colors(
+                selectedIconColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                selectedTextColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                indicatorColor = androidx.compose.material3.MaterialTheme.colorScheme.primaryContainer,
+                unselectedIconColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                unselectedTextColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+            )
         )
         NavigationBarItem(
-            icon = { Icon(Icons.Default.Settings, contentDescription = stringResource(id = R.string.nav_settings)) },
-            label = { Text(stringResource(id = R.string.nav_settings)) },
+            icon = { 
+                Icon(
+                    painterResource(id = R.drawable.ic_settings), 
+                    contentDescription = stringResource(id = R.string.nav_settings)
+                ) 
+            },
+            label = { 
+                Text(
+                    text = stringResource(id = R.string.nav_settings),
+                    style = androidx.compose.material3.MaterialTheme.typography.labelMedium
+                ) 
+            },
             selected = currentDestination?.hierarchy?.any { 
                 it.route?.contains("SettingsRoute") == true 
             } == true,
@@ -177,7 +242,14 @@ private fun BottomNavigationBar(
                     launchSingleTop = true
                     restoreState = true
                 }
-            }
+            },
+            colors = androidx.compose.material3.NavigationBarItemDefaults.colors(
+                selectedIconColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                selectedTextColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                indicatorColor = androidx.compose.material3.MaterialTheme.colorScheme.primaryContainer,
+                unselectedIconColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                unselectedTextColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+            )
         )
     }
 }
