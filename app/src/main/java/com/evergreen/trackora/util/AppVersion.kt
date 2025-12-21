@@ -135,11 +135,11 @@ object AppVersion {
      * Checks if this is a major version (patch and minor are 0).
      */
     val isMajorVersion: Boolean
-        get() = true
+        get() = VERSION_MINOR == 0 && VERSION_PATCH == 0
 
     /**
      * Checks if this is a minor version (patch is 0).
      */
     val isMinorVersion: Boolean
-        get() = true
+        get() = VERSION_PATCH == 0
 }

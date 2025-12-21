@@ -1,14 +1,63 @@
-# IDE
-.idea/
-*.iml
+# Built application files
+*.apk
+*.aar
+*.ap_
+*.aab
 
-# Gradle
+# Files for the ART/Dalvik VM
+*.dex
+
+# Java class files
+*.class
+
+# Generated files
+bin/
+gen/
+out/
+release/
+
+# Gradle files
 .gradle/
 build/
 **/build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
 
-# Local config
+# Local configuration files (sensitive)
 local.properties
+keystore.properties
+signing.properties
+*.keystore
+*.jks
+*.p12
+*.pfx
+
+# Android Studio / IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+.idea_modules/
+
+# Eclipse
+.classpath
+.project
+.settings/
+bin/
+
+# VS Code
+.vscode/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
 
 # Kotlin
 .kotlin/
@@ -17,16 +66,40 @@ local.properties
 .externalNativeBuild/
 .cxx/
 
-# Logs & temp
+# Logs & temp files
 *.log
 *.tmp
 *.swp
 *.swo
+*.bak
 
-# OS
-.DS_Store
-Thumbs.db
+# ProGuard
+proguard/
 
-# Keystores
-*.jks
+# NDK
+obj/
+.externalNativeBuild
+
+# Android Profiling
+*.hprof
+
+# Backup files
+*.orig
+
+# Sensitive data - DO NOT COMMIT
+secrets.properties
+api-keys.properties
+config.properties
+.env
+.env.local
+.env.*.local
+
+# App signing keys - NEVER COMMIT
+app/release/
+app/debug/
 *.keystore
+*.jks
+*.p12
+*.pfx
+keystore/
+signing/
