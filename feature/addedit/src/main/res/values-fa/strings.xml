@@ -1,15 +1,38 @@
 <resources>
     <string name="add_work_title">افزودن کار</string>
     <string name="edit_work_title">ویرایش کار</string>
+    
+    <!-- Field Labels -->
     <string name="field_title_required">عنوان *</string>
+    <string name="field_description_optional">توضیحات (اختیاری)</string>
     <string name="field_quantity_optional">تعداد (اختیاری)</string>
     <string name="label_status">وضعیت</string>
+    <string name="label_date">تاریخ</string>
+    
+    <!-- Placeholders -->
+    <string name="placeholder_title">مثال: تکمیل مستندات پروژه</string>
+    <string name="placeholder_description">جزئیات بیشتری درباره این کار اضافه کنید…</string>
+    <string name="placeholder_quantity">مثال: ۵</string>
+    
+    <!-- Hints -->
+    <string name="hint_quantity">یک عدد مثبت وارد کنید</string>
+    <string name="hint_date_picker">برای تغییر تاریخ ضربه بزنید</string>
+    
+    <!-- Status Values -->
     <string name="status_in_progress">در حال انجام</string>
     <string name="status_completed">تکمیل‌شده</string>
     <string name="status_delivered">تحویل‌شده</string>
-    <string name="label_date">تاریخ: %1$s</string>
+    
+    <!-- Actions -->
+    <string name="action_save">ذخیره</string>
+    <string name="action_select">انتخاب</string>
+    <string name="action_cancel">لغو</string>
+    
+    <!-- Content Descriptions -->
+    <string name="content_back">بازگشت</string>
+    <string name="content_select_date">انتخاب تاریخ</string>
+    
+    <!-- Errors -->
     <string name="error_title_required">عنوان ضروری است</string>
     <string name="error_entry_not_found">رکورد یافت نشد</string>
-    <string name="action_save">ذخیره</string>
-    <string name="content_back">بازگشت</string>
 </resources>

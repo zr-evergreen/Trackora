@@ -40,14 +40,49 @@ class AddEditWorkViewModel @Inject constructor(
     }
 
     fun onTitleChange(value: String) {
+        val trimmed = value.trimStart()
+        val titleError = when {
+            trimmed.isBlank() && value.isNotEmpty() -> null // Don't show error while typing
+            trimmed.length > 100 -> "Title must be 100 characters or less"
+            else -> null
+        }
         _uiState.update {
-            it.copy(title = value, errorMessage = null, isSaved = false)
+            it.copy(
+                title = trimmed,
+                titleError = titleError,
+                errorMessage = null,
+                isSaved = false
+            )
+        }
+    }
+
+    fun onDescriptionChange(value: String) {
+        val trimmed = if (value.length <= 500) value.trimStart() else value.take(500).trimStart()
+        _uiState.update {
+            it.copy(
+                description = trimmed,
+                errorMessage = null,
+                isSaved = false
+            )
         }
     }
 
     fun onQuantityChange(value: String) {
         val sanitized = value.filter { it.isDigit() }
-        _uiState.update { it.copy(quantityInput = sanitized, isSaved = false) }
+        val quantityError = when {
+            sanitized.isEmpty() -> null
+            sanitized.toIntOrNull()?.let { it <= 0 } == true -> "Quantity must be greater than 0"
+            sanitized.toIntOrNull()?.let { it > 999999 } == true -> "Quantity is too large"
+            else -> null
+        }
+        _uiState.update {
+            it.copy(
+                quantityInput = sanitized,
+                quantityError = quantityError,
+                errorMessage = null,
+                isSaved = false
+            )
+        }
     }
 
     fun onStatusChange(status: Status) {
@@ -55,7 +90,15 @@ class AddEditWorkViewModel @Inject constructor(
     }
 
     fun onDateChange(date: LocalDate) {
-        _uiState.update { it.copy(date = date, isSaved = false) }
+        _uiState.update { it.copy(date = date, showDatePicker = false, isSaved = false) }
+    }
+
+    fun showDatePicker() {
+        _uiState.update { it.copy(showDatePicker = true) }
+    }
+
+    fun dismissDatePicker() {
+        _uiState.update { it.copy(showDatePicker = false) }
     }
 
     fun clearError() {
@@ -71,6 +114,7 @@ class AddEditWorkViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             title = entry.title,
+                            description = entry.description ?: "",
                             quantityInput = entry.quantity?.toString() ?: "",
                             status = entry.status,
                             date = entry.date,
@@ -98,19 +142,50 @@ class AddEditWorkViewModel @Inject constructor(
 
     fun save() {
         val currentState = _uiState.value
-        if (currentState.title.isBlank()) {
-            _uiState.update { it.copy(errorMessage = "Title is required") }
+        
+        // Validate title
+        val titleError = when {
+            currentState.title.isBlank() -> "Title is required"
+            currentState.title.length > 100 -> "Title must be 100 characters or less"
+            else -> null
+        }
+        
+        // Validate quantity if provided
+        val quantityError = when {
+            currentState.quantityInput.isEmpty() -> null
+            currentState.quantityInput.toIntOrNull() == null -> "Please enter a valid number"
+            currentState.quantityInput.toIntOrNull()?.let { it <= 0 } == true -> "Quantity must be greater than 0"
+            currentState.quantityInput.toIntOrNull()?.let { it > 999999 } == true -> "Quantity is too large"
+            else -> null
+        }
+        
+        if (titleError != null || quantityError != null) {
+            _uiState.update {
+                it.copy(
+                    titleError = titleError,
+                    quantityError = quantityError,
+                    errorMessage = titleError ?: quantityError
+                )
+            }
             return
         }
 
         viewModelScope.launch {
-            _uiState.update { it.copy(isSaving = true, errorMessage = null) }
+            _uiState.update { 
+                it.copy(
+                    isSaving = true, 
+                    errorMessage = null,
+                    titleError = null,
+                    quantityError = null
+                ) 
+            }
             try {
                 val quantity = currentState.quantityInput.toIntOrNull()
+                val description = currentState.description.trim().takeIf { it.isNotBlank() }
                 val entry = WorkEntry(
                     id = currentEntryId ?: 0,
                     title = currentState.title.trim(),
-                    description = null,
+                    description = description,
                     quantity = quantity,
                     status = currentState.status,
                     date = currentState.date
