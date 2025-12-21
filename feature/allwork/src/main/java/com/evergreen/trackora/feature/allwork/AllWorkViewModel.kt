@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.evergreen.trackora.domain.model.Status
 import com.evergreen.trackora.domain.usecase.GetAllWorkEntriesUseCase
+import com.evergreen.trackora.util.AppConstants
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,7 +36,8 @@ class AllWorkViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            errorMessage = exception.message ?: "Failed to load entries"
+                            errorMessage = exception.message
+                                ?: AppConstants.Errors.FAILED_TO_LOAD_ENTRIES
                         )
                     }
                 }

@@ -6,6 +6,7 @@ import com.evergreen.trackora.domain.model.Status
 import com.evergreen.trackora.domain.model.WorkEntry
 import com.evergreen.trackora.domain.usecase.GetWorkEntriesByDateRangeUseCase
 import com.evergreen.trackora.domain.usecase.GetWorkEntriesByDateUseCase
+import com.evergreen.trackora.util.AppConstants
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -58,7 +59,8 @@ class ReportsViewModel @Inject constructor(
                 .catch { exception ->
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        errorMessage = exception.message ?: "Failed to load reports"
+                        errorMessage = exception.message
+                            ?: AppConstants.Errors.FAILED_TO_LOAD_ENTRIES
                     )
                 }
                 .collect { state ->
@@ -67,6 +69,10 @@ class ReportsViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Converts a list of work entries into a summary report.
+     * Extracted to a separate method for better testability and Single Responsibility.
+     */
     private fun toSummary(label: String, entries: List<WorkEntry>): ReportSummary {
         val completed = entries.count { it.status == Status.COMPLETED }
         val delivered = entries.count { it.status == Status.DELIVERED }

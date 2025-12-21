@@ -6,6 +6,10 @@ import java.time.LocalDate
 /**
  * UI state for the Add/Edit Work screen.
  */
+/**
+ * UI state for the Add/Edit Work screen.
+ * Follows immutability principles with computed properties.
+ */
 data class AddEditWorkUiState(
     val title: String = "",
     val description: String = "",
@@ -23,12 +27,30 @@ data class AddEditWorkUiState(
     val titleError: String? = null,
     val quantityError: String? = null
 ) {
+    /**
+     * Checks if the form is valid for submission.
+     * Title must be non-blank and there should be no validation errors.
+     */
     val isValid: Boolean
         get() = title.isNotBlank() && titleError == null && quantityError == null
-    
+
+    /**
+     * Checks if the user has made any changes to the form.
+     * Used to determine if save button should be enabled.
+     */
     val hasChanges: Boolean
-        get() = title.isNotBlank() || description.isNotBlank() || quantityInput.isNotBlank() ||
-                customField1.isNotBlank() || customField2.isNotBlank() || customField3.isNotBlank()
+        get() = title.isNotBlank() ||
+                description.isNotBlank() ||
+                quantityInput.isNotBlank() ||
+                customField1.isNotBlank() ||
+                customField2.isNotBlank() ||
+                customField3.isNotBlank()
+
+    /**
+     * Checks if the form is in a loading or saving state.
+     */
+    val isProcessing: Boolean
+        get() = isLoading || isSaving
 }
 
 

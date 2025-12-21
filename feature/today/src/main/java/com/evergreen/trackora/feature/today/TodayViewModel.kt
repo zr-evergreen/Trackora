@@ -7,6 +7,7 @@ import com.evergreen.trackora.domain.model.WorkEntry
 import com.evergreen.trackora.domain.usecase.GetWorkEntriesByDateUseCase
 import com.evergreen.trackora.domain.usecase.InsertWorkEntryUseCase
 import com.evergreen.trackora.domain.usecase.UpdateWorkEntryUseCase
+import com.evergreen.trackora.util.AppConstants
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,29 +28,30 @@ class TodayViewModel @Inject constructor(
     private val insertWorkEntryUseCase: InsertWorkEntryUseCase,
     private val updateWorkEntryUseCase: UpdateWorkEntryUseCase
 ) : ViewModel() {
-    
+
     private val _uiState = MutableStateFlow(TodayUiState())
     val uiState: StateFlow<TodayUiState> = _uiState.asStateFlow()
-    
+
     private val today: LocalDate = LocalDate.now()
-    
+
     init {
         observeTodayEntries()
     }
-    
+
     /**
      * Observe today's work entries.
      */
     private fun observeTodayEntries() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-            
+
             getWorkEntriesByDateUseCase(today)
                 .catch { exception ->
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            errorMessage = exception.message ?: "Failed to load entries"
+                            errorMessage = exception.message
+                                ?: AppConstants.Errors.FAILED_TO_LOAD_ENTRIES
                         )
                     }
                 }
@@ -64,7 +66,7 @@ class TodayViewModel @Inject constructor(
                 }
         }
     }
-    
+
     /**
      * Add a new work entry for today.
      */
@@ -76,11 +78,11 @@ class TodayViewModel @Inject constructor(
     ) {
         if (title.isBlank()) {
             _uiState.update {
-                it.copy(errorMessage = "Title cannot be empty")
+                it.copy(errorMessage = AppConstants.Errors.TITLE_CANNOT_BE_EMPTY)
             }
             return
         }
-        
+
         viewModelScope.launch {
             try {
                 val newEntry = WorkEntry(
@@ -94,12 +96,12 @@ class TodayViewModel @Inject constructor(
                 // State will be updated automatically via Flow
             } catch (e: Exception) {
                 _uiState.update {
-                    it.copy(errorMessage = e.message ?: "Failed to add entry")
+                    it.copy(errorMessage = e.message ?: AppConstants.Errors.FAILED_TO_ADD)
                 }
             }
         }
     }
-    
+
     /**
      * Update the status of a work entry.
      */
@@ -113,17 +115,17 @@ class TodayViewModel @Inject constructor(
                     // State will be updated automatically via Flow
                 } else {
                     _uiState.update {
-                        it.copy(errorMessage = "Entry not found")
+                        it.copy(errorMessage = AppConstants.Errors.ENTRY_NOT_FOUND)
                     }
                 }
             } catch (e: Exception) {
                 _uiState.update {
-                    it.copy(errorMessage = e.message ?: "Failed to update status")
+                    it.copy(errorMessage = e.message ?: AppConstants.Errors.FAILED_TO_UPDATE_STATUS)
                 }
             }
         }
     }
-    
+
     /**
      * Update a work entry.
      */
@@ -134,12 +136,12 @@ class TodayViewModel @Inject constructor(
                 // State will be updated automatically via Flow
             } catch (e: Exception) {
                 _uiState.update {
-                    it.copy(errorMessage = e.message ?: "Failed to update entry")
+                    it.copy(errorMessage = e.message ?: AppConstants.Errors.FAILED_TO_UPDATE)
                 }
             }
         }
     }
-    
+
     /**
      * Clear error message.
      */

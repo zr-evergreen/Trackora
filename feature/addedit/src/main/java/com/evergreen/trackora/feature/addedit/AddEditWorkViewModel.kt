@@ -10,6 +10,8 @@ import com.evergreen.trackora.domain.usecase.InsertWorkEntryUseCase
 import com.evergreen.trackora.domain.usecase.UpdateWorkEntryUseCase
 import com.evergreen.trackora.settings.CustomFields
 import com.evergreen.trackora.settings.CustomFieldsManager
+import com.evergreen.trackora.util.AppConstants
+import com.evergreen.trackora.util.WorkEntryValidator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -49,16 +51,15 @@ class AddEditWorkViewModel @Inject constructor(
     }
 
     fun onTitleChange(value: String) {
-        val trimmed = value.trimStart()
-        val titleError = when {
-            trimmed.isBlank() && value.isNotEmpty() -> null // Don't show error while typing
-            trimmed.length > 100 -> "Title must be 100 characters or less"
-            else -> null
-        }
+        val sanitized = WorkEntryValidator.sanitizeTitle(value)
+        val validationResult = WorkEntryValidator.validateTitle(
+            sanitized,
+            allowEmptyWhileTyping = value.isNotEmpty()
+        )
         _uiState.update {
             it.copy(
-                title = trimmed,
-                titleError = titleError,
+                title = sanitized,
+                titleError = validationResult.errorMessage,
                 errorMessage = null,
                 isSaved = false
             )
@@ -66,10 +67,10 @@ class AddEditWorkViewModel @Inject constructor(
     }
 
     fun onDescriptionChange(value: String) {
-        val trimmed = if (value.length <= 500) value.trimStart() else value.take(500).trimStart()
+        val sanitized = WorkEntryValidator.sanitizeDescription(value)
         _uiState.update {
             it.copy(
-                description = trimmed,
+                description = sanitized,
                 errorMessage = null,
                 isSaved = false
             )
@@ -107,17 +108,12 @@ class AddEditWorkViewModel @Inject constructor(
     }
 
     fun onQuantityChange(value: String) {
-        val sanitized = value.filter { it.isDigit() }
-        val quantityError = when {
-            sanitized.isEmpty() -> null
-            sanitized.toIntOrNull()?.let { it <= 0 } == true -> "Quantity must be greater than 0"
-            sanitized.toIntOrNull()?.let { it > 999999 } == true -> "Quantity is too large"
-            else -> null
-        }
+        val sanitized = WorkEntryValidator.sanitizeQuantity(value)
+        val validationResult = WorkEntryValidator.validateQuantity(sanitized)
         _uiState.update {
             it.copy(
                 quantityInput = sanitized,
-                quantityError = quantityError,
+                quantityError = validationResult.errorMessage,
                 errorMessage = null,
                 isSaved = false
             )
@@ -167,7 +163,7 @@ class AddEditWorkViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            errorMessage = "Entry not found"
+                            errorMessage = AppConstants.Errors.ENTRY_NOT_FOUND
                         )
                     }
                 }
@@ -175,7 +171,7 @@ class AddEditWorkViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        errorMessage = e.message ?: "Failed to load entry"
+                        errorMessage = e.message ?: AppConstants.Errors.FAILED_TO_LOAD
                     )
                 }
             }
@@ -185,32 +181,18 @@ class AddEditWorkViewModel @Inject constructor(
     fun save() {
         val currentState = _uiState.value
 
-        // Validate title
-        val titleError = when {
-            currentState.title.isBlank() -> "Title is required"
-            currentState.title.length > 100 -> "Title must be 100 characters or less"
-            else -> null
-        }
+        // Validate all fields using centralized validator
+        val (titleValidation, quantityValidation) = WorkEntryValidator.validateForSave(
+            currentState.title,
+            currentState.quantityInput
+        )
 
-        // Validate quantity if provided
-        val quantityError = when {
-            currentState.quantityInput.isEmpty() -> null
-            currentState.quantityInput.toIntOrNull() == null -> "Please enter a valid number"
-            currentState.quantityInput.toIntOrNull()
-                ?.let { it <= 0 } == true -> "Quantity must be greater than 0"
-
-            currentState.quantityInput.toIntOrNull()
-                ?.let { it > 999999 } == true -> "Quantity is too large"
-
-            else -> null
-        }
-
-        if (titleError != null || quantityError != null) {
+        if (!titleValidation.isValid || !quantityValidation.isValid) {
             _uiState.update {
                 it.copy(
-                    titleError = titleError,
-                    quantityError = quantityError,
-                    errorMessage = titleError ?: quantityError
+                    titleError = titleValidation.errorMessage,
+                    quantityError = quantityValidation.errorMessage,
+                    errorMessage = titleValidation.errorMessage ?: quantityValidation.errorMessage
                 )
             }
             return
@@ -254,7 +236,7 @@ class AddEditWorkViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         isSaving = false,
-                        errorMessage = e.message ?: "Unable to save entry"
+                        errorMessage = e.message ?: AppConstants.Errors.FAILED_TO_SAVE
                     )
                 }
             }
