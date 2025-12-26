@@ -8,6 +8,7 @@
     <string name="field_quantity_optional">تعداد (اختیاری)</string>
     <string name="label_status">وضعیت</string>
     <string name="label_date">تاریخ</string>
+    <string name="label_photo">عکس (اختیاری)</string>
     
     <!-- Placeholders -->
     <string name="placeholder_title">مثال: تکمیل مستندات پروژه</string>
@@ -27,6 +28,9 @@
     <string name="action_save">ذخیره</string>
     <string name="action_select">انتخاب</string>
     <string name="action_cancel">لغو</string>
+    <string name="action_take_photo">عکس بگیر</string>
+    <string name="action_choose_from_gallery">انتخاب از گالری</string>
+    <string name="action_remove_photo">حذف عکس</string>
     
     <!-- Content Descriptions -->
     <string name="content_back">بازگشت</string>

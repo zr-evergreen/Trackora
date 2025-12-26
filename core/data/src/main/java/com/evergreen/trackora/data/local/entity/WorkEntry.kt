@@ -33,6 +33,8 @@ data class WorkEntry(
     
     val customField2: String? = null,
     
-    val customField3: String? = null
+    val customField3: String? = null,
+    
+    val photoUri: String? = null,
 )
 

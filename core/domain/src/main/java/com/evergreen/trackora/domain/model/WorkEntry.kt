@@ -15,6 +15,7 @@ data class WorkEntry(
     val date: LocalDate,
     val customField1: String? = null,
     val customField2: String? = null,
-    val customField3: String? = null
+    val customField3: String? = null,
+    val photoUri: String? = null,
 )
 

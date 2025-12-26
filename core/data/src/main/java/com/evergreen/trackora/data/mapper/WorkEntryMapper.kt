@@ -18,7 +18,8 @@ object WorkEntryMapper {
             date = entity.date,
             customField1 = entity.customField1,
             customField2 = entity.customField2,
-            customField3 = entity.customField3
+            customField3 = entity.customField3,
+            photoUri = entity.photoUri,
         )
     }
     
@@ -32,7 +33,8 @@ object WorkEntryMapper {
             date = domain.date,
             customField1 = domain.customField1,
             customField2 = domain.customField2,
-            customField3 = domain.customField3
+            customField3 = domain.customField3,
+            photoUri = domain.photoUri,
         )
     }
     

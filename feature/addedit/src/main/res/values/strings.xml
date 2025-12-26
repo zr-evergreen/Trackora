@@ -8,6 +8,7 @@
     <string name="field_quantity_optional">Quantity (optional)</string>
     <string name="label_status">Status</string>
     <string name="label_date">Date</string>
+    <string name="label_photo">Photo (optional)</string>
     
     <!-- Placeholders -->
     <string name="placeholder_title">e.g., Complete project documentation</string>
@@ -27,6 +28,9 @@
     <string name="action_save">Save</string>
     <string name="action_select">Select</string>
     <string name="action_cancel">Cancel</string>
+    <string name="action_take_photo">Take Photo</string>
+    <string name="action_choose_from_gallery">Choose from Gallery</string>
+    <string name="action_remove_photo">Remove Photo</string>
     
     <!-- Content Descriptions -->
     <string name="content_back">Back</string>

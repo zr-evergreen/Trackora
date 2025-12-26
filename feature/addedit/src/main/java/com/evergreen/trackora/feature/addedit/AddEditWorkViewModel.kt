@@ -136,6 +136,25 @@ class AddEditWorkViewModel @Inject constructor(
         _uiState.update { it.copy(showDatePicker = false) }
     }
 
+    fun onPhotoSelected(uri: String?) {
+        _uiState.update {
+            it.copy(
+                photoUri = uri,
+                errorMessage = null,
+                isSaved = false
+            )
+        }
+    }
+
+    fun clearPhoto() {
+        _uiState.update {
+            it.copy(
+                photoUri = null,
+                isSaved = false
+            )
+        }
+    }
+
     fun clearError() {
         _uiState.update { it.copy(errorMessage = null) }
     }
@@ -156,6 +175,7 @@ class AddEditWorkViewModel @Inject constructor(
                             customField3 = entry.customField3 ?: "",
                             status = entry.status,
                             date = entry.date,
+                            photoUri = entry.photoUri,
                             isLoading = false
                         )
                     }
@@ -222,7 +242,8 @@ class AddEditWorkViewModel @Inject constructor(
                     date = currentState.date,
                     customField1 = customField1,
                     customField2 = customField2,
-                    customField3 = customField3
+                    customField3 = customField3,
+                    photoUri = currentState.photoUri?.takeIf { it.isNotBlank() }
                 )
 
                 if (currentEntryId == null) {
@@ -243,5 +264,3 @@ class AddEditWorkViewModel @Inject constructor(
         }
     }
 }
-
-

@@ -25,7 +25,8 @@ data class AddEditWorkUiState(
     val errorMessage: String? = null,
     val isSaved: Boolean = false,
     val titleError: String? = null,
-    val quantityError: String? = null
+    val quantityError: String? = null,
+    val photoUri: String? = null,
 ) {
     /**
      * Checks if the form is valid for submission.
@@ -44,7 +45,8 @@ data class AddEditWorkUiState(
                 quantityInput.isNotBlank() ||
                 customField1.isNotBlank() ||
                 customField2.isNotBlank() ||
-                customField3.isNotBlank()
+                customField3.isNotBlank() ||
+                photoUri != null
 
     /**
      * Checks if the form is in a loading or saving state.

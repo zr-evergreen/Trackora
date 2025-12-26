@@ -12,7 +12,7 @@ import com.evergreen.trackora.data.local.entity.WorkEntry
  */
 @Database(
     entities = [WorkEntry::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
