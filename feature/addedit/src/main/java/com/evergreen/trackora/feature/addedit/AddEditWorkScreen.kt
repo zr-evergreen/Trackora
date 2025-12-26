@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -62,6 +63,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
@@ -494,9 +496,13 @@ private fun StatusSelector(
     selected: Status,
     onSelected: (Status) -> Unit
 ) {
+    val scrollState = rememberScrollState()
+    
     Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(scrollState),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Status.values().forEach { status ->
             FilterChip(
@@ -509,7 +515,9 @@ private fun StatusSelector(
                             Status.COMPLETED -> stringResource(id = R.string.status_completed)
                             Status.DELIVERED -> stringResource(id = R.string.status_delivered)
                         },
-                        style = MaterialTheme.typography.labelMedium
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Visible
                     )
                 },
                 colors = FilterChipDefaults.filterChipColors(
@@ -517,7 +525,7 @@ private fun StatusSelector(
                     selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
                     selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
                 ),
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.height(40.dp)
             )
         }
     }
@@ -613,37 +621,43 @@ private fun PhotoSelector(
             }
         }
     } else {
-        // Show photo selection options
-        Row(
+        // Show photo selection options - always stack vertically for better UX
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // Take Photo Button
             Button(
                 onClick = onTakePhoto,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(
                     imageVector = Icons.Default.PhotoCamera,
                     contentDescription = null,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(20.dp)
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(stringResource(id = R.string.action_take_photo))
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = stringResource(id = R.string.action_take_photo),
+                    style = MaterialTheme.typography.labelLarge
+                )
             }
 
             // Choose from Gallery Button
             Button(
                 onClick = onChooseFromGallery,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(
                     imageVector = Icons.Default.PhotoLibrary,
                     contentDescription = null,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(20.dp)
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(stringResource(id = R.string.action_choose_from_gallery))
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = stringResource(id = R.string.action_choose_from_gallery),
+                    style = MaterialTheme.typography.labelLarge
+                )
             }
         }
     }
