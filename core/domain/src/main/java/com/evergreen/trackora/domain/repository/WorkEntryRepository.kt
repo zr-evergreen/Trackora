@@ -1,5 +1,6 @@
 package com.evergreen.trackora.domain.repository
 
+import com.evergreen.trackora.domain.model.Status
 import com.evergreen.trackora.domain.model.WorkEntry
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
@@ -60,5 +61,10 @@ interface WorkEntryRepository {
      * Get the count of entries within a date range.
      */
     fun getEntryCountByDateRange(startDate: LocalDate, endDate: LocalDate): Flow<Int>
+    
+    /**
+     * Get work entries by status.
+     */
+    suspend fun getEntriesByStatus(status: Status): List<WorkEntry>
 }
 

@@ -2,6 +2,7 @@ package com.evergreen.trackora.data.repository
 
 import com.evergreen.trackora.data.local.dao.WorkEntryDao
 import com.evergreen.trackora.data.mapper.WorkEntryMapper
+import com.evergreen.trackora.domain.model.Status
 import com.evergreen.trackora.domain.model.WorkEntry
 import com.evergreen.trackora.domain.repository.WorkEntryRepository
 import kotlinx.coroutines.flow.Flow
@@ -68,6 +69,11 @@ class WorkEntryRepositoryImpl @Inject constructor(
         endDate: LocalDate
     ): Flow<Int> {
         return workEntryDao.getEntryCountByDateRange(startDate, endDate)
+    }
+    
+    override suspend fun getEntriesByStatus(status: Status): List<WorkEntry> {
+        val entities = workEntryDao.getEntriesByStatus(status.name)
+        return WorkEntryMapper.toDomainList(entities)
     }
 }
 

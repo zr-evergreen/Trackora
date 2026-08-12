@@ -37,4 +37,12 @@
     <string name="settings_section_about_desc">Basic information about this app.</string>
     <string name="settings_about_version_label">Version</string>
 
+    <!-- Notification strings -->
+    <string name="notification_channel_description">Notifications for in-progress work reminders</string>
+    <string name="notification_in_progress_title">In-Progress Work Reminder</string>
+    <plurals name="notification_in_progress_message">
+        <item quantity="one">You have %d work in progress</item>
+        <item quantity="other">You have %d works in progress</item>
+    </plurals>
+
 </resources>

@@ -40,5 +40,8 @@ interface WorkEntryDao {
     
     @Query("SELECT COUNT(*) FROM work_entries WHERE date >= :startDate AND date <= :endDate")
     fun getEntryCountByDateRange(startDate: LocalDate, endDate: LocalDate): Flow<Int>
+    
+    @Query("SELECT * FROM work_entries WHERE status = :status")
+    suspend fun getEntriesByStatus(status: String): List<WorkEntry>
 }
 
