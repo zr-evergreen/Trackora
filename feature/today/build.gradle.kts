@@ -30,6 +30,7 @@ android {
         }
     }
     compileOptions {
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
@@ -42,6 +43,9 @@ android {
 }
 
 dependencies {
+    // Backports java.time to API < 26 (minSdk is 24)
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
+
     implementation(project(":core:common"))
     implementation(project(":core:domain"))
     implementation(project(":core:data"))
