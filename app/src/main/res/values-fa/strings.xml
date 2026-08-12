@@ -37,4 +37,12 @@
     <string name="settings_section_about_desc">اطلاعات کلی درباره این برنامه.</string>
     <string name="settings_about_version_label">نسخه برنامه</string>
 
+    <!-- Notification strings (Farsi) -->
+    <string name="notification_channel_description">اعلان‌های یادآوری کارهای در حال انجام</string>
+    <string name="notification_in_progress_title">یادآوری کار در حال انجام</string>
+    <plurals name="notification_in_progress_message">
+        <item quantity="one">شما %d کار در حال انجام دارید</item>
+        <item quantity="other">شما %d کار در حال انجام دارید</item>
+    </plurals>
+
 </resources>
