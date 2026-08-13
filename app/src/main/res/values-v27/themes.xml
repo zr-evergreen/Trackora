@@ -1,0 +1,11 @@
+<resources>
+    <!--
+        android:windowLightNavigationBar was added in API 27. Applying it here
+        rather than in values/ keeps it off the API 24-26 code path, where it
+        would be an unrecognised attribute.
+    -->
+    <style name="Theme.Trackora" parent="Base.Theme.Trackora">
+        <!-- Light navigation bar to match the light background. -->
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+</resources>
