@@ -1,23 +1,33 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme using AppCompat, required for AppCompatActivity. -->
     <!-- This theme is used for system UI elements and is complemented by Material 3 Compose theme. -->
-    <style name="Theme.Trackora" parent="Theme.AppCompat.DayNight.NoActionBar">
+    <!--
+        Split into a Base.* style plus a thin Theme.Trackora on top so that
+        API-gated attributes can be added in values-v27 without duplicating
+        every colour. A style declared in a qualified folder replaces the whole
+        style rather than merging into it, so the shared values have to live in
+        a parent that the qualified variant can inherit from.
+    -->
+    <style name="Base.Theme.Trackora" parent="Theme.AppCompat.DayNight.NoActionBar">
         <!-- Primary brand color - Modern professional blue -->
         <item name="colorPrimary">@color/trackora_blue_primary</item>
         <item name="colorPrimaryDark">@color/trackora_blue_dark</item>
         <item name="colorAccent">@color/teal_500</item>
-        
+
         <!-- Status bar - matches Material 3 background -->
         <item name="android:statusBarColor">@color/trackora_background</item>
         <item name="android:windowLightStatusBar">true</item>
-        
+
         <!-- Navigation bar -->
+        <!-- android:windowLightNavigationBar is set in values-v27; it needs
+             API 27 and is simply absent on Android 7 and 8.0. -->
         <item name="android:navigationBarColor">@color/trackora_background</item>
-        <item name="android:windowLightNavigationBar">true</item>
-        
+
         <!-- Window background -->
         <item name="android:windowBackground">@color/trackora_background</item>
-        
+
         <!-- Customize your theme here. -->
     </style>
+
+    <style name="Theme.Trackora" parent="Base.Theme.Trackora" />
 </resources>

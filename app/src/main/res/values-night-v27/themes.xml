@@ -1,0 +1,11 @@
+<resources>
+    <!--
+        The night counterpart to values-v27. Base.Theme.Trackora resolves to
+        the values-night definition here, so this only has to state the
+        API 27+ attribute.
+    -->
+    <style name="Theme.Trackora" parent="Base.Theme.Trackora">
+        <!-- Dark navigation bar, so the icons on it stay light. -->
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+</resources>
