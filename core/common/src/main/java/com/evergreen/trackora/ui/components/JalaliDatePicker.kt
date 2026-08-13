@@ -12,9 +12,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -94,6 +98,7 @@ fun JalaliDatePickerDialog(
             DateSelectorSection(
                 label = if (usePersianNames) "سال" else "Year",
                 value = selectedYear,
+                usePersianNames = usePersianNames,
                 onDecrease = { if (selectedYear > 1300) selectedYear-- },
                 onIncrease = { if (selectedYear < 1500) selectedYear++ },
                 onValueChange = { /* Year input handled by buttons */ }
@@ -110,7 +115,8 @@ fun JalaliDatePickerDialog(
                 } else {
                     JalaliCalendar.getJalaliMonthNameEn(selectedMonth)
                 },
-                onDecrease = { 
+                usePersianNames = usePersianNames,
+                onDecrease = {
                     if (selectedMonth > 1) {
                         selectedMonth--
                         val maxDays = JalaliCalendar.getDaysInJalaliMonth(selectedYear, selectedMonth)
@@ -134,6 +140,7 @@ fun JalaliDatePickerDialog(
             DateSelectorSection(
                 label = if (usePersianNames) "روز" else "Day",
                 value = selectedDay,
+                usePersianNames = usePersianNames,
                 onDecrease = { if (selectedDay > 1) selectedDay-- },
                 onIncrease = { if (selectedDay < maxDaysInMonth) selectedDay++ },
                 onValueChange = { /* Day input handled by buttons */ }
@@ -173,10 +180,19 @@ private fun DateSelectorSection(
     label: String,
     value: Int,
     displayValue: String = value.toString(),
+    usePersianNames: Boolean,
     onDecrease: () -> Unit,
     onIncrease: () -> Unit,
     onValueChange: (Int) -> Unit
 ) {
+    // Naming the field in the description matters here: the dialog stacks three
+    // identical stepper rows, so an unqualified "decrease" leaves a screen
+    // reader user unable to tell the year control from the day control.
+    val decreaseDescription =
+        if (usePersianNames) "کاهش $label" else "Decrease $label"
+    val increaseDescription =
+        if (usePersianNames) "افزایش $label" else "Increase $label"
+
     Column(
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -195,7 +211,7 @@ private fun DateSelectorSection(
                 onClick = onDecrease,
                 modifier = Modifier.width(56.dp)
             ) {
-                Text("−", style = MaterialTheme.typography.titleLarge)
+                Icon(Icons.Default.Remove, contentDescription = decreaseDescription)
             }
             
             Card(
@@ -226,7 +242,7 @@ private fun DateSelectorSection(
                 onClick = onIncrease,
                 modifier = Modifier.width(56.dp)
             ) {
-                Text("+", style = MaterialTheme.typography.titleLarge)
+                Icon(Icons.Default.Add, contentDescription = increaseDescription)
             }
         }
     }
