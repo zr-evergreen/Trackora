@@ -77,6 +77,9 @@ dependencies {
     implementation(libs.coil.compose)
     
     testImplementation(libs.junit)
+    testImplementation(libs.mockk)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.turbine)
     androidTestImplementation(libs.androidx.junit)
     debugImplementation(libs.compose.ui.tooling)
 }
