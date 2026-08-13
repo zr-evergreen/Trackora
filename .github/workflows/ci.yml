@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A new push to the same branch makes an in-flight run obsolete. Without this,
+# a quick series of pushes queues up builds that all report on stale commits.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build, test and lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          # Only the default branch may write to the cache; PR runs read it.
+          # A fork's PR must not be able to poison the cache for everyone else.
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: Assemble
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Unit tests
+        run: ./gradlew testDebugUnitTest --stacktrace
+
+      - name: Lint
+        run: ./gradlew lintDebug --stacktrace
+
+      # if: always() so a red build still publishes the reports that explain
+      # why it went red — otherwise the one artifact you need is the one the
+      # failure prevented from uploading.
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            **/build/reports/tests/
+            **/build/test-results/
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Upload lint reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-reports
+          path: '**/build/reports/lint-results-*.html'
+          retention-days: 14
+          if-no-files-found: warn
+
+  instrumentation:
+    name: Instrumentation tests (API 24)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      # The hardware acceleration the emulator needs is not available by
+      # default on GitHub's Linux runners.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # API 24 specifically, not the newest available: these tests exist to
+      # prove java.time still resolves through core library desugaring on the
+      # oldest supported release. Running them on API 34 would pass no matter
+      # what, because there java.time is in the platform.
+      - name: Run DAO tests on API 24
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 24
+          target: default
+          arch: x86_64
+          disable-animations: true
+          script: ./gradlew :core:data:connectedDebugAndroidTest --stacktrace
+
+      - name: Upload instrumentation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instrumentation-reports
+          path: '**/build/reports/androidTests/'
+          retention-days: 14
+          if-no-files-found: warn
