@@ -39,6 +39,7 @@ import com.evergreen.trackora.R
 import com.evergreen.trackora.locale.AppLocale
 import com.evergreen.trackora.settings.CustomFields
 import com.evergreen.trackora.theme.AppThemeMode
+import com.evergreen.trackora.ui.text.localizedDigits
 import com.evergreen.trackora.util.AppVersion
 
 @Composable
@@ -279,7 +280,7 @@ private fun SettingsScreenContent(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = AppVersion.displayVersion,
+                    text = localizedDigits(AppVersion.displayVersion),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Medium

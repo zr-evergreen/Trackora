@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -88,9 +89,9 @@ fun WorkEntryItem(
                 ) {
                     StatusChip(status = entry.status)
                     
-                    if (entry.quantity != null) {
+                    entry.quantity?.let { quantity ->
                         Text(
-                            text = "Qty: ${entry.quantity}",
+                            text = stringResource(id = R.string.qty_label, quantity),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

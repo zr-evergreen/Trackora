@@ -7,4 +7,7 @@
     <string name="today_completed">Completed</string>
     <string name="today_delivered">Delivered</string>
     <string name="today_add_work_entry">Add Work Entry</string>
+    <!-- Wording must stay identical to qty_label in :feature:allwork, which
+         labels the same value on the All Work list. -->
+    <string name="qty_label">Qty: %1$d</string>
 </resources>

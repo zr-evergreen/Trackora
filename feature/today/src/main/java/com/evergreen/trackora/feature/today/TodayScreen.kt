@@ -30,6 +30,7 @@ import com.evergreen.trackora.domain.model.WorkEntry
 import com.evergreen.trackora.feature.today.R
 import com.evergreen.trackora.ui.components.TrackoraScreenContainer
 import com.evergreen.trackora.ui.components.TrackoraSummaryCard
+import com.evergreen.trackora.ui.text.localizedNumber
 import com.evergreen.trackora.ui.theme.TrackoraTheme
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -124,9 +125,9 @@ private fun SummaryCardModern(
     TrackoraSummaryCard(
         modifier = modifier,
         leftTitle = stringResource(id = R.string.today_completed),
-        leftValue = completedCount.toString(),
+        leftValue = localizedNumber(completedCount),
         rightTitle = stringResource(id = R.string.today_delivered),
-        rightValue = deliveredCount.toString()
+        rightValue = localizedNumber(deliveredCount)
     )
 }
 
