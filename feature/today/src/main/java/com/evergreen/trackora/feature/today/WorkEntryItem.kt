@@ -26,6 +26,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.evergreen.trackora.domain.model.Status
 import com.evergreen.trackora.domain.model.WorkEntry
+import com.evergreen.trackora.ui.text.forUserContent
 import com.evergreen.trackora.ui.theme.TrackoraTheme
 import java.time.LocalDate
 
@@ -64,7 +65,7 @@ fun WorkEntryItem(
             ) {
                 Text(
                     text = entry.title,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleMedium.forUserContent(),
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -74,7 +75,7 @@ fun WorkEntryItem(
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = description,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodyMedium.forUserContent(),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
