@@ -41,8 +41,8 @@
     <string name="notification_channel_description">اعلان‌های یادآوری کارهای در حال انجام</string>
     <string name="notification_in_progress_title">یادآوری کار در حال انجام</string>
     <plurals name="notification_in_progress_message">
-        <item quantity="one">شما %d کار در حال انجام دارید</item>
-        <item quantity="other">شما %d کار در حال انجام دارید</item>
+        <item quantity="one">%d کار در حال انجام دارید</item>
+        <item quantity="other">%d کار در حال انجام دارید</item>
     </plurals>
 
 </resources>
