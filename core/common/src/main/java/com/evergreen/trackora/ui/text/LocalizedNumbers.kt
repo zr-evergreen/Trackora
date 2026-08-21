@@ -20,7 +20,10 @@ import com.evergreen.trackora.util.PersianDigits
  */
 
 /**
- * Whether the active locale should render Persian-Indic digits.
+ * Whether the active locale is Persian.
+ *
+ * The single place this question is answered, so digits, dates, month names and
+ * calendar choice can never disagree about which locale is in effect.
  *
  * Keyed off the language subtag rather than the full locale, so `fa`, `fa-IR`
  * and `fa-AF` all agree. The check reads from the composition's configuration,
@@ -28,7 +31,7 @@ import com.evergreen.trackora.util.PersianDigits
  */
 @Composable
 @ReadOnlyComposable
-fun usePersianDigits(): Boolean =
+fun isPersianLocale(): Boolean =
     LocalConfiguration.current.locales[0].language == "fa"
 
 /**
@@ -40,7 +43,7 @@ fun usePersianDigits(): Boolean =
 @Composable
 @ReadOnlyComposable
 fun localizedNumber(value: Int): String =
-    PersianDigits.format(value, usePersianDigits())
+    PersianDigits.format(value, isPersianLocale())
 
 /**
  * Formats a number that must carry no thousands grouping — years, day and
@@ -51,7 +54,7 @@ fun localizedNumber(value: Int): String =
 @Composable
 @ReadOnlyComposable
 fun localizedNumberUngrouped(value: Int): String =
-    PersianDigits.formatUngrouped(value, usePersianDigits())
+    PersianDigits.formatUngrouped(value, isPersianLocale())
 
 /**
  * Converts any Western digits already embedded in [text] to match the locale.
@@ -64,4 +67,4 @@ fun localizedNumberUngrouped(value: Int): String =
 @Composable
 @ReadOnlyComposable
 fun localizedDigits(text: String): String =
-    if (usePersianDigits()) PersianDigits.toPersian(text) else text
+    if (isPersianLocale()) PersianDigits.toPersian(text) else text

@@ -98,6 +98,45 @@ object JalaliCalendar {
     }
     
     /**
+     * Persian weekday names, indexed by [persianWeekdayIndex] — so element 0 is
+     * شنبه, not Monday.
+     */
+    private val PERSIAN_WEEKDAYS = arrayOf(
+        "شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه"
+    )
+
+    /**
+     * Position of [date] within the Iranian week, where Saturday is 0 and
+     * Friday is 6.
+     *
+     * The Iranian week starts on Saturday. `java.time.DayOfWeek` numbers from
+     * Monday = 1 (ISO), so any calendar grid or weekday list built directly
+     * from `dayOfWeek.value` silently lands a Persian user on a Monday-first
+     * week — one of the errors an Iranian user spots instantly.
+     */
+    fun persianWeekdayIndex(date: LocalDate): Int {
+        // ISO: Mon=1 … Sat=6, Sun=7. Saturday must map to 0, so shift by two
+        // and wrap: Sat(6)->0, Sun(7)->1, Mon(1)->2 … Fri(5)->6.
+        return (date.dayOfWeek.value + 1) % 7
+    }
+
+    /** Persian name of the weekday [date] falls on. */
+    fun getPersianWeekdayName(date: LocalDate): String =
+        PERSIAN_WEEKDAYS[persianWeekdayIndex(date)]
+
+    /**
+     * Whether [date] falls on the Iranian weekend.
+     *
+     * Iran's weekend is Friday, with Thursday afternoon off in much of the
+     * public sector. Only Friday is treated as the weekend here: this drives
+     * whole-day shading in date views, and a Thursday is a normal working day
+     * for the self-employed users this app is aimed at, so marking it off
+     * would be wrong more often than right.
+     */
+    fun isIranianWeekend(date: LocalDate): Boolean =
+        date.dayOfWeek == java.time.DayOfWeek.FRIDAY
+
+    /**
      * Format Jalali date for display.
      */
     fun formatJalaliDate(jalaliDate: JalaliDate, usePersianNames: Boolean = true): String {

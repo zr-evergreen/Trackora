@@ -71,14 +71,13 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.evergreen.trackora.domain.model.Status
 import com.evergreen.trackora.ui.components.JalaliDatePickerDialog
+import com.evergreen.trackora.ui.text.localizedRelativeDate
 import com.evergreen.trackora.util.JalaliCalendar
-import com.evergreen.trackora.util.JalaliCalendar.JalaliDate
 import java.io.File
 import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.util.Date
 import java.util.Locale
 
@@ -164,24 +163,10 @@ fun AddEditWorkScreen(
         }
     }
 
-    val dateFormatter = if (isPersian) {
-        // Will use Jalali formatting
-        null
-    } else {
-        DateTimeFormatter.ofPattern("MMM d, yyyy")
-    }
-
     val titleText = if (entryId == null) {
         stringResource(id = R.string.add_work_title)
     } else {
         stringResource(id = R.string.edit_work_title)
-    }
-
-    // Get Jalali date for display if Persian
-    val jalaliDate = if (isPersian) {
-        JalaliCalendar.gregorianToJalali(uiState.date)
-    } else {
-        null
     }
 
     if (uiState.isSaved) {
@@ -387,9 +372,6 @@ fun AddEditWorkScreen(
             )
             DatePickerCard(
                 date = uiState.date,
-                jalaliDate = jalaliDate,
-                dateFormatter = dateFormatter,
-                isPersian = isPersian,
                 onClick = { viewModel.showDatePicker() }
             )
 
@@ -450,8 +432,7 @@ fun AddEditWorkScreen(
                         val gregorianDate = JalaliCalendar.jalaliToGregorian(jalaliDate)
                         viewModel.onDateChange(gregorianDate)
                     },
-                    onDismiss = { viewModel.dismissDatePicker() },
-                    usePersianNames = true
+                    onDismiss = { viewModel.dismissDatePicker() }
                 )
             } else {
                 // Use standard Gregorian date picker
@@ -534,9 +515,6 @@ private fun StatusSelector(
 @Composable
 private fun DatePickerCard(
     date: LocalDate,
-    jalaliDate: JalaliDate?,
-    dateFormatter: DateTimeFormatter?,
-    isPersian: Boolean,
     onClick: () -> Unit
 ) {
     Card(
@@ -557,13 +535,11 @@ private fun DatePickerCard(
         ) {
             Column {
                 Text(
-                    text = if (isPersian && jalaliDate != null) {
-                        JalaliCalendar.formatJalaliDate(jalaliDate, usePersianNames = true)
-                    } else if (dateFormatter != null) {
-                        date.format(dateFormatter)
-                    } else {
-                        date.toString()
-                    },
+                    // Most entries are logged for the day they happened, so
+                    // this reads "امروز" far more often than it spells out a
+                    // date — which is how an Iranian user expects it to read.
+                    // The exact date is one tap away in the picker.
+                    text = localizedRelativeDate(date = date, today = LocalDate.now()),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface
                 )

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Relative date labels. -->
+    <string name="date_today">Today</string>
+    <string name="date_yesterday">Yesterday</string>
+    <string name="date_tomorrow">Tomorrow</string>
+
+    <!-- These only ever receive counts of two or more, since -1, 0 and +1 are
+         handled by the named labels above. They are plurals anyway: the "one"
+         form costs nothing and stops the resource being wrong if the caller's
+         range ever widens. -->
+    <plurals name="date_days_ago">
+        <item quantity="one">%1$d day ago</item>
+        <item quantity="other">%1$d days ago</item>
+    </plurals>
+    <plurals name="date_in_days">
+        <item quantity="one">In %1$d day</item>
+        <item quantity="other">In %1$d days</item>
+    </plurals>
+
+    <!-- Jalali date picker. These were previously hardcoded in the composable
+         and selected with a boolean, which meant the dialog's language was
+         whatever the caller passed rather than the language the user chose. -->
+    <string name="date_picker_title">Select Date</string>
+    <string name="date_picker_year">Year</string>
+    <string name="date_picker_month">Month</string>
+    <string name="date_picker_day">Day</string>
+    <string name="date_picker_cancel">Cancel</string>
+    <string name="date_picker_confirm">Confirm</string>
+    <!-- The dialog stacks three identical stepper rows, so the field name has
+         to be in the description or a screen reader user cannot tell the year
+         control from the day control. -->
+    <string name="date_picker_decrease">Decrease %1$s</string>
+    <string name="date_picker_increase">Increase %1$s</string>
+</resources>

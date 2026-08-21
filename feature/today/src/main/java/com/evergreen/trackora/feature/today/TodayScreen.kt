@@ -30,10 +30,10 @@ import com.evergreen.trackora.domain.model.WorkEntry
 import com.evergreen.trackora.feature.today.R
 import com.evergreen.trackora.ui.components.TrackoraScreenContainer
 import com.evergreen.trackora.ui.components.TrackoraSummaryCard
+import com.evergreen.trackora.ui.text.localizedDate
 import com.evergreen.trackora.ui.text.localizedNumber
 import com.evergreen.trackora.ui.theme.TrackoraTheme
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 
 /**
  * Today screen - the heart of the app.
@@ -46,8 +46,7 @@ fun TodayScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val today = LocalDate.now()
-    val dateFormatter = DateTimeFormatter.ofPattern(stringResource(id = R.string.today_date_format))
-    
+
     TrackoraScreenContainer(
         modifier = Modifier
             .fillMaxSize()
@@ -62,7 +61,7 @@ fun TodayScreen(
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = today.format(dateFormatter),
+                text = localizedDate(date = today, includeWeekday = true),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

@@ -1,6 +1,5 @@
 <resources>
     <string name="today_title">Today</string>
-    <string name="today_date_format">EEEE, MMM d, yyyy</string>
     <string name="today_empty_title">No entries for today</string>
     <string name="today_empty_subtitle">Tap the ➕ button to add a work entry</string>
     <string name="today_summary">Summary</string>
