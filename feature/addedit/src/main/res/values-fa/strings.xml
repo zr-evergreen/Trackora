@@ -28,7 +28,7 @@
     <string name="action_save">ذخیره</string>
     <string name="action_select">انتخاب</string>
     <string name="action_cancel">لغو</string>
-    <string name="action_take_photo">عکس بگیر</string>
+    <string name="action_take_photo">گرفتن عکس</string>
     <string name="action_choose_from_gallery">انتخاب از گالری</string>
     <string name="action_remove_photo">حذف عکس</string>
     
