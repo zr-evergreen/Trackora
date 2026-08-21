@@ -41,6 +41,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -71,7 +72,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.evergreen.trackora.domain.model.Status
 import com.evergreen.trackora.ui.components.JalaliDatePickerDialog
+import com.evergreen.trackora.ui.text.forUserContent
 import com.evergreen.trackora.ui.text.localizedRelativeDate
+import com.evergreen.trackora.util.AppConstants
 import com.evergreen.trackora.util.JalaliCalendar
 import java.io.File
 import java.text.SimpleDateFormat
@@ -208,6 +211,11 @@ fun AddEditWorkScreen(
                 label = { Text(stringResource(id = R.string.field_title_required)) },
                 placeholder = { Text(stringResource(id = R.string.placeholder_title)) },
                 singleLine = true,
+                // The field holds user content, so it needs the same bidi
+                // treatment as the list that displays it back. Without this a
+                // title typed as "Nike order 42:" shows as ":Nike order 42"
+                // while being typed, then corrects itself once saved.
+                textStyle = LocalTextStyle.current.forUserContent(),
                 modifier = Modifier.fillMaxWidth(),
                 isError = titleError != null,
                 supportingText = {
@@ -218,7 +226,11 @@ fun AddEditWorkScreen(
                         )
                     } else {
                         Text(
-                            text = "${uiState.title.length}/100",
+                            text = stringResource(
+                                id = R.string.char_counter,
+                                uiState.title.length,
+                                AppConstants.TITLE_MAX_LENGTH
+                            ),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall
                         )
@@ -236,13 +248,18 @@ fun AddEditWorkScreen(
                 onValueChange = viewModel::onDescriptionChange,
                 label = { Text(stringResource(id = R.string.field_description_optional)) },
                 placeholder = { Text(stringResource(id = R.string.placeholder_description)) },
+                textStyle = LocalTextStyle.current.forUserContent(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(120.dp),
                 maxLines = 5,
                 supportingText = {
                     Text(
-                        text = "${uiState.description.length}/500",
+                        text = stringResource(
+                            id = R.string.char_counter,
+                            uiState.description.length,
+                            AppConstants.DESCRIPTION_MAX_LENGTH
+                        ),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall
                     )

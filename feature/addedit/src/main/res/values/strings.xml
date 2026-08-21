@@ -42,4 +42,10 @@
     <!-- Errors -->
     <string name="error_title_required">Title is required</string>
     <string name="error_entry_not_found">Entry not found</string>
+
+    <!-- Character counter under the title and description fields. Both numbers
+         go through the resource formatter so they pick up the locale's digits;
+         the counter read "0/100" in the Persian build when it was built by
+         string interpolation. -->
+    <string name="char_counter">%1$d/%2$d</string>
 </resources>
