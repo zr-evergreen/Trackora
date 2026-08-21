@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import com.evergreen.trackora.feature.reports.R
 import com.evergreen.trackora.ui.components.TrackoraScreenContainer
 import com.evergreen.trackora.ui.components.TrackoraSummaryCard
+import com.evergreen.trackora.ui.text.localizedNumber
 
 /**
  * Reports screen for viewing numeric summaries.
@@ -135,9 +136,9 @@ private fun ReportsSummaryCard(summary: ReportSummary) {
     TrackoraSummaryCard(
         modifier = Modifier.fillMaxWidth(),
         leftTitle = stringResource(id = R.string.reports_completed),
-        leftValue = summary.completed.toString(),
+        leftValue = localizedNumber(summary.completed),
         rightTitle = stringResource(id = R.string.reports_delivered),
-        rightValue = summary.delivered.toString()
+        rightValue = localizedNumber(summary.delivered)
     )
 
     Spacer(modifier = Modifier.height(12.dp))
@@ -148,12 +149,12 @@ private fun ReportsSummaryCard(summary: ReportSummary) {
     ) {
         SummaryStat(
             label = stringResource(id = R.string.reports_completed),
-            value = summary.completed.toString(),
+            value = localizedNumber(summary.completed),
             modifier = Modifier.weight(1f)
         )
         SummaryStat(
             label = stringResource(id = R.string.reports_quantity),
-            value = summary.totalQuantity.toString(),
+            value = localizedNumber(summary.totalQuantity),
             modifier = Modifier.weight(1f)
         )
     }

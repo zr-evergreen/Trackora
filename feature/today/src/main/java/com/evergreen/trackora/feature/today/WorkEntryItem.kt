@@ -19,12 +19,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.evergreen.trackora.domain.model.Status
 import com.evergreen.trackora.domain.model.WorkEntry
+import com.evergreen.trackora.ui.text.forUserContent
 import com.evergreen.trackora.ui.theme.TrackoraTheme
 import java.time.LocalDate
 
@@ -63,7 +65,7 @@ fun WorkEntryItem(
             ) {
                 Text(
                     text = entry.title,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleMedium.forUserContent(),
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -73,7 +75,7 @@ fun WorkEntryItem(
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = description,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodyMedium.forUserContent(),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
@@ -88,9 +90,9 @@ fun WorkEntryItem(
                 ) {
                     StatusChip(status = entry.status)
                     
-                    if (entry.quantity != null) {
+                    entry.quantity?.let { quantity ->
                         Text(
-                            text = "Qty: ${entry.quantity}",
+                            text = stringResource(id = R.string.qty_label, quantity),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -114,9 +116,12 @@ private fun StatusChip(
     modifier: Modifier = Modifier
 ) {
     val (text, color) = when (status) {
-        Status.IN_PROGRESS -> "In Progress" to Color(0xFFFF9800)
-        Status.COMPLETED -> "Completed" to Color(0xFF4CAF50)
-        Status.DELIVERED -> "Delivered" to Color(0xFF2196F3)
+        Status.IN_PROGRESS ->
+            stringResource(R.string.status_in_progress) to Color(0xFFFF9800)
+        Status.COMPLETED ->
+            stringResource(R.string.status_completed) to Color(0xFF4CAF50)
+        Status.DELIVERED ->
+            stringResource(R.string.status_delivered) to Color(0xFF2196F3)
     }
     
     Card(
@@ -152,9 +157,12 @@ private fun StatusSelector(
                 label = {
                     Text(
                         text = when (status) {
-                            Status.IN_PROGRESS -> "IP"
-                            Status.COMPLETED -> "C"
-                            Status.DELIVERED -> "D"
+                            Status.IN_PROGRESS ->
+                                stringResource(R.string.status_short_in_progress)
+                            Status.COMPLETED ->
+                                stringResource(R.string.status_short_completed)
+                            Status.DELIVERED ->
+                                stringResource(R.string.status_short_delivered)
                         },
                         style = MaterialTheme.typography.labelSmall
                     )

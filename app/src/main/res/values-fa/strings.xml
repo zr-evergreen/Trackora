@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">تراکورا</string>
+    <string name="app_name">Trackora</string>
     <string name="nav_today">امروز</string>
     <string name="nav_all_work">همه کارها</string>
     <string name="nav_reports">گزارش‌ها</string>
@@ -10,7 +10,7 @@
     <string name="language_system_default">زبان دستگاه</string>
     <string name="language_english">انگلیسی</string>
     <string name="language_persian">فارسی</string>
-    <string name="settings_theme">پوسته</string>
+    <string name="settings_theme">حالت نمایش</string>
     <string name="theme_system_default">مطابق دستگاه</string>
     <string name="theme_light">روشن</string>
     <string name="theme_dark">تیره</string>
@@ -41,8 +41,8 @@
     <string name="notification_channel_description">اعلان‌های یادآوری کارهای در حال انجام</string>
     <string name="notification_in_progress_title">یادآوری کار در حال انجام</string>
     <plurals name="notification_in_progress_message">
-        <item quantity="one">شما %d کار در حال انجام دارید</item>
-        <item quantity="other">شما %d کار در حال انجام دارید</item>
+        <item quantity="one">%d کار در حال انجام دارید</item>
+        <item quantity="other">%d کار در حال انجام دارید</item>
     </plurals>
 
 </resources>

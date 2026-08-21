@@ -30,10 +30,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.evergreen.trackora.common.R
+import com.evergreen.trackora.ui.text.isPersianLocale
+import com.evergreen.trackora.ui.text.localizedNumberUngrouped
 import com.evergreen.trackora.util.JalaliCalendar
 import com.evergreen.trackora.util.JalaliCalendar.JalaliDate
 
@@ -45,9 +49,13 @@ import com.evergreen.trackora.util.JalaliCalendar.JalaliDate
 fun JalaliDatePickerDialog(
     initialDate: JalaliDate,
     onDateSelected: (JalaliDate) -> Unit,
-    onDismiss: () -> Unit,
-    usePersianNames: Boolean = true
+    onDismiss: () -> Unit
 ) {
+    // Month names follow the locale like every other string in the dialog.
+    // This used to be a caller-supplied boolean, which meant the dialog could
+    // be told to disagree with the language the user had actually chosen.
+    val usePersianNames = isPersianLocale()
+
     var selectedYear by remember { mutableIntStateOf(initialDate.year) }
     var selectedMonth by remember { mutableIntStateOf(initialDate.month) }
     var selectedDay by remember { mutableIntStateOf(initialDate.day) }
@@ -87,7 +95,7 @@ fun JalaliDatePickerDialog(
                         .padding(16.dp)
                 ) {
             Text(
-                text = if (usePersianNames) "انتخاب تاریخ" else "Select Date",
+                text = stringResource(R.string.date_picker_title),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
@@ -96,9 +104,8 @@ fun JalaliDatePickerDialog(
             
             // Year selector
             DateSelectorSection(
-                label = if (usePersianNames) "سال" else "Year",
+                label = stringResource(R.string.date_picker_year),
                 value = selectedYear,
-                usePersianNames = usePersianNames,
                 onDecrease = { if (selectedYear > 1300) selectedYear-- },
                 onIncrease = { if (selectedYear < 1500) selectedYear++ },
                 onValueChange = { /* Year input handled by buttons */ }
@@ -108,14 +115,13 @@ fun JalaliDatePickerDialog(
             
             // Month selector
             DateSelectorSection(
-                label = if (usePersianNames) "ماه" else "Month",
+                label = stringResource(R.string.date_picker_month),
                 value = selectedMonth,
                 displayValue = if (usePersianNames) {
                     JalaliCalendar.getJalaliMonthName(selectedMonth)
                 } else {
                     JalaliCalendar.getJalaliMonthNameEn(selectedMonth)
                 },
-                usePersianNames = usePersianNames,
                 onDecrease = {
                     if (selectedMonth > 1) {
                         selectedMonth--
@@ -138,9 +144,8 @@ fun JalaliDatePickerDialog(
             // Day selector
             val maxDaysInMonth = JalaliCalendar.getDaysInJalaliMonth(selectedYear, selectedMonth)
             DateSelectorSection(
-                label = if (usePersianNames) "روز" else "Day",
+                label = stringResource(R.string.date_picker_day),
                 value = selectedDay,
-                usePersianNames = usePersianNames,
                 onDecrease = { if (selectedDay > 1) selectedDay-- },
                 onIncrease = { if (selectedDay < maxDaysInMonth) selectedDay++ },
                 onValueChange = { /* Day input handled by buttons */ }
@@ -158,7 +163,7 @@ fun JalaliDatePickerDialog(
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text(if (usePersianNames) "لغو" else "Cancel")
+                    Text(stringResource(R.string.date_picker_cancel))
                 }
                 Button(
                     onClick = {
@@ -166,7 +171,7 @@ fun JalaliDatePickerDialog(
                     },
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text(if (usePersianNames) "تأیید" else "Confirm")
+                    Text(stringResource(R.string.date_picker_confirm))
                 }
             }
                 }
@@ -179,19 +184,15 @@ fun JalaliDatePickerDialog(
 private fun DateSelectorSection(
     label: String,
     value: Int,
-    displayValue: String = value.toString(),
-    usePersianNames: Boolean,
+    // Years and days are bare numbers, so they need the locale's digits. The
+    // month row passes its own name through instead and is left alone.
+    displayValue: String = localizedNumberUngrouped(value),
     onDecrease: () -> Unit,
     onIncrease: () -> Unit,
     onValueChange: (Int) -> Unit
 ) {
-    // Naming the field in the description matters here: the dialog stacks three
-    // identical stepper rows, so an unqualified "decrease" leaves a screen
-    // reader user unable to tell the year control from the day control.
-    val decreaseDescription =
-        if (usePersianNames) "کاهش $label" else "Decrease $label"
-    val increaseDescription =
-        if (usePersianNames) "افزایش $label" else "Increase $label"
+    val decreaseDescription = stringResource(R.string.date_picker_decrease, label)
+    val increaseDescription = stringResource(R.string.date_picker_increase, label)
 
     Column(
         modifier = Modifier.fillMaxWidth()
