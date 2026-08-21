@@ -116,9 +116,12 @@ private fun StatusChip(
     modifier: Modifier = Modifier
 ) {
     val (text, color) = when (status) {
-        Status.IN_PROGRESS -> "In Progress" to Color(0xFFFF9800)
-        Status.COMPLETED -> "Completed" to Color(0xFF4CAF50)
-        Status.DELIVERED -> "Delivered" to Color(0xFF2196F3)
+        Status.IN_PROGRESS ->
+            stringResource(R.string.status_in_progress) to Color(0xFFFF9800)
+        Status.COMPLETED ->
+            stringResource(R.string.status_completed) to Color(0xFF4CAF50)
+        Status.DELIVERED ->
+            stringResource(R.string.status_delivered) to Color(0xFF2196F3)
     }
     
     Card(
@@ -154,9 +157,12 @@ private fun StatusSelector(
                 label = {
                     Text(
                         text = when (status) {
-                            Status.IN_PROGRESS -> "IP"
-                            Status.COMPLETED -> "C"
-                            Status.DELIVERED -> "D"
+                            Status.IN_PROGRESS ->
+                                stringResource(R.string.status_short_in_progress)
+                            Status.COMPLETED ->
+                                stringResource(R.string.status_short_completed)
+                            Status.DELIVERED ->
+                                stringResource(R.string.status_short_delivered)
                         },
                         style = MaterialTheme.typography.labelSmall
                     )

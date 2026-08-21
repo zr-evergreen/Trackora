@@ -9,4 +9,15 @@
     <!-- Wording must stay identical to qty_label in :feature:allwork, which
          labels the same value on the All Work list. -->
     <string name="qty_label">تعداد: %1$d</string>
+
+    <!-- Status names. Wording must stay identical to filter_in_progress and
+         friends in :feature:allwork, which name the same three states. -->
+    <string name="status_in_progress">در حال انجام</string>
+    <string name="status_completed">تکمیل‌شده</string>
+    <string name="status_delivered">تحویل‌شده</string>
+
+    <!-- Short forms for the three-up status selector. -->
+    <string name="status_short_in_progress">جاری</string>
+    <string name="status_short_completed">تکمیل</string>
+    <string name="status_short_delivered">تحویل</string>
 </resources>
