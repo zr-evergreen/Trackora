@@ -10,7 +10,7 @@
     <string name="language_system_default">زبان دستگاه</string>
     <string name="language_english">انگلیسی</string>
     <string name="language_persian">فارسی</string>
-    <string name="settings_theme">پوسته</string>
+    <string name="settings_theme">حالت نمایش</string>
     <string name="theme_system_default">مطابق دستگاه</string>
     <string name="theme_light">روشن</string>
     <string name="theme_dark">تیره</string>
