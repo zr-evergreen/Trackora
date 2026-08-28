@@ -46,6 +46,12 @@ dependencies {
     // Backports java.time to API < 26 (minSdk is 24)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
+    // core/domain is a leaf with no dependencies of its own, so this adds
+    // no cycle and keeps the domain layer Android-free. It lets shared UI
+    // speak in domain terms — StatusBadge takes a Status rather than making
+    // every feature map one to colours itself.
+    implementation(project(":core:domain"))
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     

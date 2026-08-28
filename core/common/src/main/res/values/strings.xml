@@ -37,4 +37,7 @@
     <string name="state_error_title">Something went wrong</string>
     <string name="state_error_body">Your work is safe. This screen could not load just now.</string>
     <string name="state_retry">Try again</string>
+    <string name="status_in_progress">In Progress</string>
+    <string name="status_completed">Completed</string>
+    <string name="status_delivered">Delivered</string>
 </resources>

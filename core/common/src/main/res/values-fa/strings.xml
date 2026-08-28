@@ -27,4 +27,7 @@
     <string name="state_error_title">مشکلی پیش آمد</string>
     <string name="state_error_body">کارهای شما در امان است. فقط این صفحه الان بارگذاری نشد.</string>
     <string name="state_retry">تلاش دوباره</string>
+    <string name="status_in_progress">در حال انجام</string>
+    <string name="status_completed">تکمیل‌شده</string>
+    <string name="status_delivered">تحویل‌شده</string>
 </resources>
