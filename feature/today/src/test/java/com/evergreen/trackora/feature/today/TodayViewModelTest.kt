@@ -3,6 +3,7 @@ package com.evergreen.trackora.feature.today
 import app.cash.turbine.test
 import com.evergreen.trackora.domain.model.Status
 import com.evergreen.trackora.domain.model.WorkEntry
+import com.evergreen.trackora.domain.usecase.GetUndeliveredWorkUseCase
 import com.evergreen.trackora.domain.usecase.GetWorkEntriesByDateUseCase
 import com.evergreen.trackora.domain.usecase.InsertWorkEntryUseCase
 import com.evergreen.trackora.domain.usecase.UpdateWorkEntryUseCase
@@ -36,6 +37,9 @@ class TodayViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     private val getWorkEntriesByDateUseCase: GetWorkEntriesByDateUseCase = mockk()
+    private val getUndeliveredWorkUseCase: GetUndeliveredWorkUseCase = mockk {
+        every { this@mockk.invoke() } returns flowOf(emptyList())
+    }
     private val insertWorkEntryUseCase: InsertWorkEntryUseCase = mockk(relaxed = true)
     private val updateWorkEntryUseCase: UpdateWorkEntryUseCase = mockk(relaxed = true)
 
@@ -49,6 +53,7 @@ class TodayViewModelTest {
 
     private fun viewModel() = TodayViewModel(
         getWorkEntriesByDateUseCase,
+        getUndeliveredWorkUseCase,
         insertWorkEntryUseCase,
         updateWorkEntryUseCase
     )
@@ -89,7 +94,7 @@ class TodayViewModelTest {
         advanceUntilIdle()
 
         assertFalse("loading cleared once data arrives", viewModel.uiState.value.isLoading)
-        assertEquals(1, viewModel.uiState.value.entryCount)
+        assertEquals(1, viewModel.uiState.value.todayEntries.size)
     }
 
     @Test
@@ -110,7 +115,7 @@ class TodayViewModelTest {
             val state = awaitItem()
 
             assertTrue(state.isEmpty)
-            assertEquals(0, state.entryCount)
+            assertEquals(0, state.todayEntries.size)
         }
     }
 
@@ -281,9 +286,144 @@ class TodayViewModelTest {
 
         val state = viewModel().uiState.value
 
-        assertEquals(4, state.entryCount)
-        assertEquals(2, state.completedCount)
-        assertEquals(1, state.deliveredCount)
+        assertEquals(4, state.todayEntries.size)
+        // completedToday counts finished work, which includes what has already
+        // been handed over — two completed plus one delivered.
+        assertEquals(3, state.completedToday)
         assertFalse(state.isEmpty)
+    }
+
+    // --- Undelivered band ---------------------------------------------------
+
+    @Test
+    fun `completed work from any date reaches the undelivered band`() = runTest {
+        val oldJob = WorkEntry(
+            id = 9, title = "Finished last week", status = Status.COMPLETED,
+            date = LocalDate.of(2026, 8, 21)
+        )
+        every { getWorkEntriesByDateUseCase(any()) } returns flowOf(emptyList())
+        every { getUndeliveredWorkUseCase() } returns flowOf(listOf(oldJob))
+
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        // The whole point: it is not from today, and it must still show.
+        assertEquals(listOf(oldJob), viewModel.uiState.value.undelivered)
+        assertEquals(1, viewModel.uiState.value.undeliveredCount)
+    }
+
+    @Test
+    fun `undelivered work alone means the screen is not empty`() = runTest {
+        every { getWorkEntriesByDateUseCase(any()) } returns flowOf(emptyList())
+        every { getUndeliveredWorkUseCase() } returns flowOf(
+            listOf(WorkEntry(id = 9, title = "Waiting", status = Status.COMPLETED,
+                date = LocalDate.of(2026, 8, 21)))
+        )
+
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.isEmpty)
+    }
+
+    // --- Status lifecycle ---------------------------------------------------
+
+    @Test
+    fun `advancing in-progress work completes it`() = runTest {
+        val entry = WorkEntry(id = 1, title = "Job", status = Status.IN_PROGRESS,
+            date = LocalDate.of(2026, 8, 28))
+        every { getWorkEntriesByDateUseCase(any()) } returns flowOf(listOf(entry))
+        every { getUndeliveredWorkUseCase() } returns flowOf(emptyList())
+
+        val viewModel = viewModel()
+        advanceUntilIdle()
+        viewModel.advanceStatus(entry)
+        advanceUntilIdle()
+
+        coVerify { updateWorkEntryUseCase(entry.copy(status = Status.COMPLETED)) }
+    }
+
+    @Test
+    fun `advancing completed work delivers it`() = runTest {
+        val entry = WorkEntry(id = 1, title = "Job", status = Status.COMPLETED,
+            date = LocalDate.of(2026, 8, 28))
+        every { getWorkEntriesByDateUseCase(any()) } returns flowOf(listOf(entry))
+        every { getUndeliveredWorkUseCase() } returns flowOf(emptyList())
+
+        val viewModel = viewModel()
+        advanceUntilIdle()
+        viewModel.advanceStatus(entry)
+        advanceUntilIdle()
+
+        coVerify { updateWorkEntryUseCase(entry.copy(status = Status.DELIVERED)) }
+    }
+
+    @Test
+    fun `delivered work has no further transition`() = runTest {
+        val entry = WorkEntry(id = 1, title = "Job", status = Status.DELIVERED,
+            date = LocalDate.of(2026, 8, 28))
+        every { getWorkEntriesByDateUseCase(any()) } returns flowOf(listOf(entry))
+        every { getUndeliveredWorkUseCase() } returns flowOf(emptyList())
+
+        val viewModel = viewModel()
+        advanceUntilIdle()
+        viewModel.advanceStatus(entry)
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { updateWorkEntryUseCase(any()) }
+        assertNull(viewModel.uiState.value.recentlyAdvanced)
+    }
+
+    @Test
+    fun `undo restores the exact previous status`() = runTest {
+        val entry = WorkEntry(id = 1, title = "Job", status = Status.IN_PROGRESS,
+            date = LocalDate.of(2026, 8, 28))
+        every { getWorkEntriesByDateUseCase(any()) } returns flowOf(listOf(entry))
+        every { getUndeliveredWorkUseCase() } returns flowOf(emptyList())
+
+        val viewModel = viewModel()
+        advanceUntilIdle()
+        viewModel.advanceStatus(entry)
+        advanceUntilIdle()
+        viewModel.undoAdvance()
+        advanceUntilIdle()
+
+        // The pre-change entry is written back, rather than a guessed reverse step.
+        coVerify { updateWorkEntryUseCase(entry) }
+        assertNull(viewModel.uiState.value.recentlyAdvanced)
+    }
+
+    // --- Quick add ----------------------------------------------------------
+
+    @Test
+    fun `quick add creates an in-progress entry dated today with no quantity`() = runTest {
+        every { getWorkEntriesByDateUseCase(any()) } returns flowOf(emptyList())
+        every { getUndeliveredWorkUseCase() } returns flowOf(emptyList())
+        val captured = slot<WorkEntry>()
+        coEvery { insertWorkEntryUseCase(capture(captured)) } returns 1L
+
+        val viewModel = viewModel()
+        advanceUntilIdle()
+        viewModel.quickAdd("  Hem trousers  ")
+        advanceUntilIdle()
+
+        assertEquals("Hem trousers", captured.captured.title)
+        assertEquals(Status.IN_PROGRESS, captured.captured.status)
+        assertNull(captured.captured.quantity)
+    }
+
+    @Test
+    fun `quick add ignores blank input rather than reporting an error`() = runTest {
+        every { getWorkEntriesByDateUseCase(any()) } returns flowOf(emptyList())
+        every { getUndeliveredWorkUseCase() } returns flowOf(emptyList())
+
+        val viewModel = viewModel()
+        advanceUntilIdle()
+        viewModel.quickAdd("   ")
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { insertWorkEntryUseCase(any()) }
+        // Pressing done on an empty field is a change of mind, not a mistake.
+        assertNull(viewModel.uiState.value.errorMessage)
     }
 }

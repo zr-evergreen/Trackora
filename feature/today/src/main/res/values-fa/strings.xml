@@ -1,6 +1,6 @@
 <resources>
     <string name="today_title">امروز</string>
-    <string name="today_empty_title">هنوز کاری برای امروز ثبت نشده</string>
+    <string name="today_empty_title">هنوز کاری ثبت نشده</string>
     <string name="today_empty_subtitle">برای افزودن کار جدید روی دکمه ➕ بزنید</string>
     <string name="today_summary">خلاصه</string>
     <string name="today_completed">تکمیل‌شده</string>
@@ -20,4 +20,14 @@
     <string name="status_short_in_progress">جاری</string>
     <string name="status_short_completed">تکمیل</string>
     <string name="status_short_delivered">تحویل</string>
+    <string name="today_quick_add_hint">چه کاری انجام دادید؟</string>
+    <string name="today_quick_add_action">افزودن</string>
+    <string name="today_section_undelivered">در انتظار تحویل</string>
+    <string name="today_section_today">کارهای امروز</string>
+    <string name="today_deliver">تحویل شد</string>
+    <string name="today_status_changed_toast">«%1$s» به‌روزرسانی شد</string>
+    <string name="today_undo">بازگرداندن</string>
+    <string name="today_empty_body">اولین کار امروز را از بالا اضافه کنید.</string>
+    <string name="today_summary_line">%1$d کار تمام‌شده · %2$d عدد</string>
+    <string name="action_mark_complete">تکمیل شد</string>
 </resources>

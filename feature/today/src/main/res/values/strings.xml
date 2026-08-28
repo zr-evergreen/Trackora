@@ -1,6 +1,6 @@
 <resources>
     <string name="today_title">Today</string>
-    <string name="today_empty_title">No entries for today</string>
+    <string name="today_empty_title">No work recorded yet</string>
     <string name="today_empty_subtitle">Tap the ➕ button to add a work entry</string>
     <string name="today_summary">Summary</string>
     <string name="today_completed">Completed</string>
@@ -22,4 +22,14 @@
     <string name="status_short_in_progress">IP</string>
     <string name="status_short_completed">C</string>
     <string name="status_short_delivered">D</string>
+    <string name="today_quick_add_hint">What did you work on?</string>
+    <string name="today_quick_add_action">Add</string>
+    <string name="today_section_undelivered">Waiting to be delivered</string>
+    <string name="today_section_today">Today’s work</string>
+    <string name="today_deliver">Delivered</string>
+    <string name="today_status_changed_toast">“%1$s” updated</string>
+    <string name="today_undo">Undo</string>
+    <string name="today_empty_body">Add the first job of the day above.</string>
+    <string name="today_summary_line">%1$d finished · %2$d items</string>
+    <string name="action_mark_complete">Completed</string>
 </resources>

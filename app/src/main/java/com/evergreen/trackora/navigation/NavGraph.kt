@@ -76,7 +76,13 @@ fun NavGraph(
         ) {
             // Feature navigation graphs
             todayNavigation(
-                contentPadding = paddingValues
+                contentPadding = paddingValues,
+                // Rows on Today are now tappable. Previously the only way to
+                // open an entry was via All Work, which users had no reason to
+                // discover.
+                onEntryClick = { entryId ->
+                    navController.navigate(AddEditWorkRoute(entryId = entryId))
+                }
             )
             
             allWorkNavigation(

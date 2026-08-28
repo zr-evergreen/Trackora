@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.evergreen.trackora.domain.model.Status
 import com.evergreen.trackora.domain.model.WorkEntry
+import com.evergreen.trackora.domain.usecase.GetUndeliveredWorkUseCase
 import com.evergreen.trackora.domain.usecase.GetWorkEntriesByDateUseCase
 import com.evergreen.trackora.domain.usecase.InsertWorkEntryUseCase
 import com.evergreen.trackora.domain.usecase.UpdateWorkEntryUseCase
@@ -25,6 +26,7 @@ import javax.inject.Inject
 @HiltViewModel
 class TodayViewModel @Inject constructor(
     private val getWorkEntriesByDateUseCase: GetWorkEntriesByDateUseCase,
+    private val getUndeliveredWorkUseCase: GetUndeliveredWorkUseCase,
     private val insertWorkEntryUseCase: InsertWorkEntryUseCase,
     private val updateWorkEntryUseCase: UpdateWorkEntryUseCase
 ) : ViewModel() {
@@ -36,6 +38,34 @@ class TodayViewModel @Inject constructor(
 
     init {
         observeTodayEntries()
+        observeUndelivered()
+    }
+
+    /**
+     * Work finished but not handed over, from any date.
+     *
+     * A separate subscription rather than a filter over today's entries: the
+     * job that matters most here is usually the oldest one, and it is by
+     * definition not from today.
+     */
+    private fun observeUndelivered() {
+        viewModelScope.launch {
+            getUndeliveredWorkUseCase()
+                .catch { exception ->
+                    // Surfaced rather than swallowed. An empty undelivered band
+                    // and a failed undelivered query look identical on screen,
+                    // and the band is the one thing this screen exists to show.
+                    _uiState.update {
+                        it.copy(
+                            errorMessage = exception.message
+                                ?: AppConstants.Errors.FAILED_TO_LOAD_ENTRIES
+                        )
+                    }
+                }
+                .collect { entries ->
+                    _uiState.update { it.copy(undelivered = entries) }
+                }
+        }
     }
 
     /**
@@ -67,9 +97,6 @@ class TodayViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Add a new work entry for today.
-     */
     /** Re-subscribes after a load failure. The flow is cold, so collecting again retries. */
     fun retry() {
         _uiState.update { it.copy(isLoading = true, errorMessage = null) }
@@ -106,6 +133,71 @@ class TodayViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    /**
+     * Records the minimum needed to capture a job: a title.
+     *
+     * Everything else takes a sensible default — in progress, dated today, no
+     * quantity — because the point of quick add is to get the job written down
+     * before the user forgets it. Quantity and the rest are a tap away in the
+     * detail screen, and adding them here would defeat the feature.
+     */
+    fun quickAdd(title: String) {
+        if (title.isBlank()) return
+        addWorkEntry(title = title)
+    }
+
+    /**
+     * Moves a job one step along the lifecycle.
+     *
+     * IN_PROGRESS becomes COMPLETED; COMPLETED becomes DELIVERED; DELIVERED is
+     * terminal and does nothing. There is exactly one forward move from any
+     * state, which is what lets the row carry a single button instead of the
+     * three status chips it used to show beside a pill that already said the
+     * same thing.
+     *
+     * One tap, no confirmation dialog. Both transitions are routine and
+     * frequent, and a dialog on each would cost more than the occasional
+     * mistake; the undo in the snackbar covers that instead.
+     */
+    fun advanceStatus(entry: WorkEntry) {
+        val next = when (entry.status) {
+            Status.IN_PROGRESS -> Status.COMPLETED
+            Status.COMPLETED -> Status.DELIVERED
+            Status.DELIVERED -> return
+        }
+        viewModelScope.launch {
+            try {
+                updateWorkEntryUseCase(entry.copy(status = next))
+                // The pre-change entry is held, so undo restores the exact
+                // previous status rather than guessing a reverse transition.
+                _uiState.update { it.copy(recentlyAdvanced = entry) }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(errorMessage = e.message ?: AppConstants.Errors.FAILED_TO_UPDATE_STATUS)
+                }
+            }
+        }
+    }
+
+    fun undoAdvance() {
+        val entry = _uiState.value.recentlyAdvanced ?: return
+        viewModelScope.launch {
+            try {
+                updateWorkEntryUseCase(entry)
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(errorMessage = e.message ?: AppConstants.Errors.FAILED_TO_UPDATE_STATUS)
+                }
+            } finally {
+                _uiState.update { it.copy(recentlyAdvanced = null) }
+            }
+        }
+    }
+
+    fun clearRecentlyAdvanced() {
+        _uiState.update { it.copy(recentlyAdvanced = null) }
     }
 
     /**
