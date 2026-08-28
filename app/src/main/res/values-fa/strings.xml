@@ -45,4 +45,23 @@
         <item quantity="other">%d کار در حال انجام دارید</item>
     </plurals>
 
+
+    <!-- CSV export -->
+    <string name="export_chooser_title">هم‌رسانی داده‌های کار</string>
+    <string name="export_nothing">هنوز کاری برای خروجی گرفتن ثبت نشده.</string>
+    <string name="export_failed">فایل خروجی ساخته نشد. دوباره تلاش کنید.</string>
+    <string name="export_column_date">تاریخ</string>
+    <string name="export_column_title">عنوان</string>
+    <string name="export_column_description">توضیحات</string>
+    <string name="export_column_quantity">تعداد</string>
+    <string name="export_column_status">وضعیت</string>
+    <string name="export_column_custom_1">فیلد سفارشی ۱</string>
+    <string name="export_column_custom_2">فیلد سفارشی ۲</string>
+    <string name="export_column_custom_3">فیلد سفارشی ۳</string>
+
+    <!-- Status names for the CSV export. Wording must stay identical to
+         status_* in :feature:today and filter_* in :feature:allwork. -->
+    <string name="status_in_progress">در حال انجام</string>
+    <string name="status_completed">تکمیل‌شده</string>
+    <string name="status_delivered">تحویل‌شده</string>
 </resources>

@@ -45,4 +45,25 @@
         <item quantity="other">You have %d works in progress</item>
     </plurals>
 
+
+    <!-- CSV export. Column headings are localised so the exported file is
+         in the user's language; the values inside stay machine-readable. -->
+    <string name="export_chooser_title">Share work data</string>
+    <string name="export_nothing">There is no work to export yet.</string>
+    <string name="export_failed">Could not create the export file. Please try again.</string>
+    <string name="export_column_date">Date</string>
+    <string name="export_column_title">Title</string>
+    <string name="export_column_description">Description</string>
+    <string name="export_column_quantity">Quantity</string>
+    <string name="export_column_status">Status</string>
+    <string name="export_column_custom_1">Custom field 1</string>
+    <string name="export_column_custom_2">Custom field 2</string>
+    <string name="export_column_custom_3">Custom field 3</string>
+
+    <!-- Status names for the CSV export. Wording must stay identical to
+         status_* in :feature:today and filter_* in :feature:allwork, which
+         name the same three states on screen. -->
+    <string name="status_in_progress">In Progress</string>
+    <string name="status_completed">Completed</string>
+    <string name="status_delivered">Delivered</string>
 </resources>

@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,16 +22,20 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -37,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.evergreen.trackora.R
 import com.evergreen.trackora.locale.AppLocale
+import com.evergreen.trackora.export.WorkEntryCsv
 import com.evergreen.trackora.settings.CustomFields
 import com.evergreen.trackora.theme.AppThemeMode
 import com.evergreen.trackora.ui.text.localizedDigits
@@ -45,19 +52,62 @@ import com.evergreen.trackora.util.AppVersion
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
-    onExportDataClick: () -> Unit = {},
     contentPadding: PaddingValues = PaddingValues()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    SettingsScreenContent(
-        uiState = uiState,
-        onLocaleSelected = viewModel::onLocaleSelected,
-        onThemeSelected = viewModel::onThemeSelected,
-        onCustomFieldsChanged = viewModel::onCustomFieldsChanged,
-        onExportDataClick = onExportDataClick,
-        contentPadding = contentPadding
+    // Column headings come from resources here rather than in the view model,
+    // which has no Context and should not be resolving strings.
+    val headers = WorkEntryCsv.Headers(
+        date = stringResource(R.string.export_column_date),
+        title = stringResource(R.string.export_column_title),
+        description = stringResource(R.string.export_column_description),
+        quantity = stringResource(R.string.export_column_quantity),
+        status = stringResource(R.string.export_column_status),
+        customField1 = stringResource(R.string.export_column_custom_1),
+        customField2 = stringResource(R.string.export_column_custom_2),
+        customField3 = stringResource(R.string.export_column_custom_3),
+        inProgress = stringResource(R.string.status_in_progress),
+        completed = stringResource(R.string.status_completed),
+        delivered = stringResource(R.string.status_delivered),
     )
+    val chooserTitle = stringResource(R.string.export_chooser_title)
+    val nothingToExport = stringResource(R.string.export_nothing)
+    val exportFailed = stringResource(R.string.export_failed)
+
+    LaunchedEffect(Unit) {
+        viewModel.eventFlow.collect { event ->
+            when (event) {
+                is SettingsEvent.ShareCsv ->
+                    context.startActivity(viewModel.shareIntent(event.uri, chooserTitle))
+
+                SettingsEvent.NothingToExport ->
+                    snackbarHostState.showSnackbar(nothingToExport)
+
+                SettingsEvent.ExportFailed ->
+                    snackbarHostState.showSnackbar(exportFailed)
+            }
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        SettingsScreenContent(
+            uiState = uiState,
+            onLocaleSelected = viewModel::onLocaleSelected,
+            onThemeSelected = viewModel::onThemeSelected,
+            onCustomFieldsChanged = viewModel::onCustomFieldsChanged,
+            onExportDataClick = { viewModel.exportCsv(headers) },
+            contentPadding = contentPadding
+        )
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(contentPadding)
+        )
+    }
 }
 
 @Composable
