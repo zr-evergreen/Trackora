@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import javax.inject.Inject
@@ -33,6 +34,12 @@ class ReportsViewModel @Inject constructor(
     val uiState: StateFlow<ReportsUiState> = _uiState.asStateFlow()
 
     init {
+        loadReports()
+    }
+
+    /** Re-runs the report queries after a failure. */
+    fun retry() {
+        _uiState.update { it.copy(isLoading = true, errorMessage = null) }
         loadReports()
     }
 

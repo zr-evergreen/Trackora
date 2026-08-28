@@ -43,6 +43,9 @@ import androidx.compose.ui.unit.dp
 import com.evergreen.trackora.domain.model.Status
 import com.evergreen.trackora.domain.model.WorkEntry
 import com.evergreen.trackora.ui.components.StatusPill
+import com.evergreen.trackora.ui.components.TrackoraEmptyState
+import com.evergreen.trackora.ui.components.TrackoraErrorState
+import com.evergreen.trackora.ui.components.TrackoraLoadingState
 import com.evergreen.trackora.ui.components.TrackoraScreenContainer
 import com.evergreen.trackora.ui.text.forUserContent
 
@@ -97,19 +100,18 @@ fun AllWorkScreen(
         Spacer(modifier = Modifier.height(12.dp))
 
         when {
-            uiState.isLoading -> {
-                CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
-                )
-            }
+            uiState.isLoading -> TrackoraLoadingState()
 
-            uiState.filteredEntries.isEmpty() -> {
-                Text(
-                    text = stringResource(id = R.string.empty_all_work),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            uiState.errorMessage != null -> TrackoraErrorState(
+                title = stringResource(id = com.evergreen.trackora.common.R.string.state_error_title),
+                message = stringResource(id = com.evergreen.trackora.common.R.string.state_error_body),
+                retryLabel = stringResource(id = com.evergreen.trackora.common.R.string.state_retry),
+                onRetry = viewModel::retry
+            )
+
+            uiState.filteredEntries.isEmpty() -> TrackoraEmptyState(
+                title = stringResource(id = R.string.empty_all_work)
+            )
 
             else -> {
                 LazyColumn(

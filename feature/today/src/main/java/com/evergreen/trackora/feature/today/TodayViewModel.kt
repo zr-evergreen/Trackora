@@ -70,6 +70,12 @@ class TodayViewModel @Inject constructor(
     /**
      * Add a new work entry for today.
      */
+    /** Re-subscribes after a load failure. The flow is cold, so collecting again retries. */
+    fun retry() {
+        _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+        observeTodayEntries()
+    }
+
     fun addWorkEntry(
         title: String,
         description: String? = null,

@@ -22,4 +22,9 @@
     <string name="date_picker_confirm">تأیید</string>
     <string name="date_picker_decrease">کاهش %1$s</string>
     <string name="date_picker_increase">افزایش %1$s</string>
+
+    <!-- Shared loading/empty/error states. -->
+    <string name="state_error_title">مشکلی پیش آمد</string>
+    <string name="state_error_body">کارهای شما در امان است. فقط این صفحه الان بارگذاری نشد.</string>
+    <string name="state_retry">تلاش دوباره</string>
 </resources>

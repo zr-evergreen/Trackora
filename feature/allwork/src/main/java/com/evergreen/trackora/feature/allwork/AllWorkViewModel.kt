@@ -58,6 +58,12 @@ class AllWorkViewModel @Inject constructor(
         }
     }
 
+    /** Re-subscribes after a load failure. The flow is cold, so collecting again retries. */
+    fun retry() {
+        _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+        observeEntries()
+    }
+
     fun setFilter(status: Status?) {
         _uiState.update { it.copy(filter = status) }
     }

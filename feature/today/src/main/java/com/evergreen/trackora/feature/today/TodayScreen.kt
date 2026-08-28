@@ -28,6 +28,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.evergreen.trackora.domain.model.Status
 import com.evergreen.trackora.domain.model.WorkEntry
 import com.evergreen.trackora.feature.today.R
+import com.evergreen.trackora.ui.components.TrackoraErrorState
+import com.evergreen.trackora.ui.components.TrackoraLoadingState
 import com.evergreen.trackora.ui.components.TrackoraScreenContainer
 import com.evergreen.trackora.ui.components.TrackoraSummaryCard
 import com.evergreen.trackora.ui.text.localizedDate
@@ -70,12 +72,15 @@ fun TodayScreen(
         Spacer(modifier = Modifier.height(16.dp))
         
         when {
-            uiState.isLoading -> {
-                CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
-                )
-            }
-            
+            uiState.isLoading -> TrackoraLoadingState()
+
+            uiState.errorMessage != null -> TrackoraErrorState(
+                title = stringResource(id = com.evergreen.trackora.common.R.string.state_error_title),
+                message = stringResource(id = com.evergreen.trackora.common.R.string.state_error_body),
+                retryLabel = stringResource(id = com.evergreen.trackora.common.R.string.state_retry),
+                onRetry = viewModel::retry
+            )
+
             uiState.isEmpty -> {
                 EmptyState(
                     modifier = Modifier

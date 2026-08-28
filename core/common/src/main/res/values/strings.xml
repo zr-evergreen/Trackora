@@ -32,4 +32,9 @@
          control from the day control. -->
     <string name="date_picker_decrease">Decrease %1$s</string>
     <string name="date_picker_increase">Increase %1$s</string>
+
+    <!-- Shared loading/empty/error states. -->
+    <string name="state_error_title">Something went wrong</string>
+    <string name="state_error_body">Your work is safe. This screen could not load just now.</string>
+    <string name="state_retry">Try again</string>
 </resources>

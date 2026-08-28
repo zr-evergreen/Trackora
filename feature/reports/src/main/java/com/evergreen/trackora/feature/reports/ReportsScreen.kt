@@ -27,6 +27,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.evergreen.trackora.feature.reports.R
+import com.evergreen.trackora.ui.components.TrackoraErrorState
+import com.evergreen.trackora.ui.components.TrackoraLoadingState
 import com.evergreen.trackora.ui.components.TrackoraScreenContainer
 import com.evergreen.trackora.ui.components.TrackoraSummaryCard
 import com.evergreen.trackora.ui.text.localizedNumber
@@ -60,8 +62,13 @@ fun ReportsScreen(
         Spacer(modifier = Modifier.height(12.dp))
 
         if (uiState.isLoading) {
-            CircularProgressIndicator(
-                modifier = Modifier.align(Alignment.CenterHorizontally)
+            TrackoraLoadingState()
+        } else if (uiState.errorMessage != null) {
+            TrackoraErrorState(
+                title = stringResource(id = com.evergreen.trackora.common.R.string.state_error_title),
+                message = stringResource(id = com.evergreen.trackora.common.R.string.state_error_body),
+                retryLabel = stringResource(id = com.evergreen.trackora.common.R.string.state_retry),
+                onRetry = viewModel::retry
             )
         } else {
             var selectedRange by rememberSaveable { mutableStateOf(ReportsRange.DAILY) }
