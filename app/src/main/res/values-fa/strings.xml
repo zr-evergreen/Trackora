@@ -38,11 +38,11 @@
     <string name="settings_about_version_label">نسخه برنامه</string>
 
     <!-- Notification strings (Farsi) -->
-    <string name="notification_channel_description">اعلان‌های یادآوری کارهای در حال انجام</string>
-    <string name="notification_in_progress_title">یادآوری کار در حال انجام</string>
-    <plurals name="notification_in_progress_message">
-        <item quantity="one">%d کار در حال انجام دارید</item>
-        <item quantity="other">%d کار در حال انجام دارید</item>
+    <string name="notification_channel_description">یادآوری روزانه کارهای آماده تحویل</string>
+    <string name="notification_undelivered_title">آماده تحویل</string>
+    <plurals name="notification_undelivered_message">
+        <item quantity="one">%d کار تمام‌شده هنوز تحویل داده نشده</item>
+        <item quantity="other">%d کار تمام‌شده هنوز تحویل داده نشده</item>
     </plurals>
 
 
@@ -64,4 +64,8 @@
     <string name="status_in_progress">در حال انجام</string>
     <string name="status_completed">تکمیل‌شده</string>
     <string name="status_delivered">تحویل‌شده</string>
+    <string name="settings_section_reminders">یادآوری</string>
+    <string name="settings_section_reminders_desc">روزی یک‌بار درباره کارهایی که تمام شده ولی هنوز تحویل نداده‌اید یادآوری می‌کند.</string>
+    <string name="settings_reminder_toggle">یادآوری روزانه</string>
+    <string name="settings_reminder_blocked">اعلان‌های ترکورا در تنظیمات اندروید خاموش است.</string>
 </resources>

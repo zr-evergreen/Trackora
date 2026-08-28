@@ -38,11 +38,11 @@
     <string name="settings_about_version_label">Version</string>
 
     <!-- Notification strings -->
-    <string name="notification_channel_description">Notifications for in-progress work reminders</string>
-    <string name="notification_in_progress_title">In-Progress Work Reminder</string>
-    <plurals name="notification_in_progress_message">
-        <item quantity="one">You have %d work in progress</item>
-        <item quantity="other">You have %d works in progress</item>
+    <string name="notification_channel_description">Daily reminders about work waiting to be delivered</string>
+    <string name="notification_undelivered_title">Waiting to be delivered</string>
+    <plurals name="notification_undelivered_message">
+        <item quantity="one">%d finished job has not been delivered yet</item>
+        <item quantity="other">%d finished jobs have not been delivered yet</item>
     </plurals>
 
 
@@ -66,4 +66,8 @@
     <string name="status_in_progress">In Progress</string>
     <string name="status_completed">Completed</string>
     <string name="status_delivered">Delivered</string>
+    <string name="settings_section_reminders">Reminders</string>
+    <string name="settings_section_reminders_desc">A once-a-day reminder about work you have finished but not yet delivered.</string>
+    <string name="settings_reminder_toggle">Daily reminder</string>
+    <string name="settings_reminder_blocked">Notifications are turned off for Trackora in Android settings.</string>
 </resources>

@@ -9,6 +9,7 @@ import com.evergreen.trackora.locale.AppLocale
 import com.evergreen.trackora.locale.LocaleManager
 import com.evergreen.trackora.settings.CustomFields
 import com.evergreen.trackora.settings.CustomFieldsManager
+import com.evergreen.trackora.settings.ReminderPreferences
 import com.evergreen.trackora.theme.AppThemeMode
 import com.evergreen.trackora.theme.ThemeManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -27,7 +28,8 @@ import javax.inject.Inject
 data class SettingsUiState(
     val selectedLocale: AppLocale = AppLocale.SYSTEM,
     val selectedTheme: AppThemeMode = AppThemeMode.SYSTEM,
-    val customFields: CustomFields = CustomFields()
+    val customFields: CustomFields = CustomFields(),
+    val reminderEnabled: Boolean = ReminderPreferences.DEFAULT_ENABLED
 )
 
 /**
@@ -46,6 +48,7 @@ class SettingsViewModel @Inject constructor(
     private val localeManager: LocaleManager,
     private val themeManager: ThemeManager,
     private val customFieldsManager: CustomFieldsManager,
+    private val reminderPreferences: ReminderPreferences,
     private val getAllWorkEntries: GetAllWorkEntriesUseCase,
     private val exporter: WorkEntryExporter
 ) : ViewModel() {
@@ -56,12 +59,14 @@ class SettingsViewModel @Inject constructor(
     val uiState: StateFlow<SettingsUiState> = combine(
         localeManager.localeFlow,
         themeManager.themeFlow,
-        customFieldsManager.allCustomFields
-    ) { locale, theme, customFields ->
+        customFieldsManager.allCustomFields,
+        reminderPreferences.enabled
+    ) { locale, theme, customFields, reminderEnabled ->
         SettingsUiState(
             selectedLocale = locale,
             selectedTheme = theme,
-            customFields = customFields
+            customFields = customFields,
+            reminderEnabled = reminderEnabled
         )
     }.stateIn(
         scope = viewModelScope,
@@ -85,6 +90,10 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             customFieldsManager.setCustomFields(customFields)
         }
+    }
+
+    fun onReminderEnabledChanged(enabled: Boolean) {
+        viewModelScope.launch { reminderPreferences.setEnabled(enabled) }
     }
 
     /** Chooser intent for a written export, so the screen never touches the exporter. */

@@ -24,6 +24,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -98,6 +99,7 @@ fun SettingsScreen(
             onLocaleSelected = viewModel::onLocaleSelected,
             onThemeSelected = viewModel::onThemeSelected,
             onCustomFieldsChanged = viewModel::onCustomFieldsChanged,
+            onReminderEnabledChanged = viewModel::onReminderEnabledChanged,
             onExportDataClick = { viewModel.exportCsv(headers) },
             contentPadding = contentPadding
         )
@@ -116,6 +118,7 @@ private fun SettingsScreenContent(
     onLocaleSelected: (AppLocale) -> Unit,
     onThemeSelected: (AppThemeMode) -> Unit,
     onCustomFieldsChanged: (CustomFields) -> Unit,
+    onReminderEnabledChanged: (Boolean) -> Unit,
     onExportDataClick: () -> Unit,
     contentPadding: PaddingValues
 ) {
@@ -294,6 +297,33 @@ private fun SettingsScreenContent(
         }
 
         // Data
+        SettingsSection(
+            title = stringResource(id = R.string.settings_section_reminders),
+            description = stringResource(id = R.string.settings_section_reminders_desc)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    // The whole row toggles, so the target is the row height
+                    // rather than the switch itself.
+                    .clickable { onReminderEnabledChanged(!uiState.reminderEnabled) }
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(id = R.string.settings_reminder_toggle),
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.weight(1f)
+                )
+                Switch(
+                    checked = uiState.reminderEnabled,
+                    onCheckedChange = onReminderEnabledChanged
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         SettingsSection(
             title = stringResource(id = R.string.settings_section_data),
             description = stringResource(id = R.string.settings_section_data_desc)

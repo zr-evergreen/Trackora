@@ -1,5 +1,11 @@
 package com.evergreen.trackora
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.compose.setContent
@@ -34,6 +40,8 @@ class MainActivity : AppCompatActivity() {
             localeManager.applySavedLocale()
             themeManager.applySavedTheme()
         }
+        requestNotificationPermissionIfNeeded()
+
         enableEdgeToEdge()
         setContent {
             TrackoraTheme {
@@ -50,5 +58,35 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+
+    /**
+     * Asks for POST_NOTIFICATIONS on Android 13 and above.
+     *
+     * The permission was declared in the manifest but never requested, so the
+     * daily reminder — the only thing this app does while closed — silently
+     * never fired on any modern device. Declaring a runtime permission without
+     * requesting it is indistinguishable from not having the feature.
+     *
+     * Asked once at launch rather than behind a rationale screen: the reminder
+     * is on by default and is the app's single background behaviour, so there
+     * is nothing to explain that the system dialog does not already say. A
+     * denial is respected — the system stops showing the dialog, the worker
+     * still runs, and its notification is simply dropped by the platform.
+     */
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+
+        val granted = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (!granted) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    private val notificationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* respected either way */ }
 }
 
