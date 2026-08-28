@@ -6,5 +6,8 @@
     <string name="filter_delivered">Delivered</string>
     <string name="empty_all_work">No work entries yet</string>
     <string name="qty_label">Qty: %1$d</string>
+    <string name="delete_entry">Delete</string>
+    <string name="entry_deleted">Deleted “%1$s”</string>
+    <string name="undo">Undo</string>
 </resources>
 
