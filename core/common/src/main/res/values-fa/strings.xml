@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="date_today">امروز</string>
+    <string name="date_yesterday">دیروز</string>
+    <string name="date_tomorrow">فردا</string>
+    <!-- Persian does not inflect the noun after a number — روز stays روز for
+         every count — so both quantity forms are identical by design. -->
+    <plurals name="date_days_ago">
+        <item quantity="one">%1$d روز پیش</item>
+        <item quantity="other">%1$d روز پیش</item>
+    </plurals>
+    <plurals name="date_in_days">
+        <item quantity="one">%1$d روز دیگر</item>
+        <item quantity="other">%1$d روز دیگر</item>
+    </plurals>
+
+    <string name="date_picker_title">انتخاب تاریخ</string>
+    <string name="date_picker_year">سال</string>
+    <string name="date_picker_month">ماه</string>
+    <string name="date_picker_day">روز</string>
+    <string name="date_picker_cancel">لغو</string>
+    <string name="date_picker_confirm">تأیید</string>
+    <string name="date_picker_decrease">کاهش %1$s</string>
+    <string name="date_picker_increase">افزایش %1$s</string>
+</resources>

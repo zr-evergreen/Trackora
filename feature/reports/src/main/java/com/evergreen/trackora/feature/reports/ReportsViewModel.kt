@@ -40,13 +40,13 @@ class ReportsViewModel @Inject constructor(
         viewModelScope.launch {
             combine(
                 getWorkEntriesByDateUseCase(today).map { entries ->
-                    toSummary(label = "Today", entries = entries)
+                    toSummary(entries = entries)
                 },
                 getWorkEntriesByDateRangeUseCase(today.minusDays(6), today).map { entries ->
-                    toSummary(label = "Last 7 days", entries = entries)
+                    toSummary(entries = entries)
                 },
                 getWorkEntriesByDateRangeUseCase(today.minusDays(29), today).map { entries ->
-                    toSummary(label = "Last 30 days", entries = entries)
+                    toSummary(entries = entries)
                 }
             ) { daily, weekly, monthly ->
                 ReportsUiState(
@@ -73,12 +73,11 @@ class ReportsViewModel @Inject constructor(
      * Converts a list of work entries into a summary report.
      * Extracted to a separate method for better testability and Single Responsibility.
      */
-    private fun toSummary(label: String, entries: List<WorkEntry>): ReportSummary {
+    private fun toSummary(entries: List<WorkEntry>): ReportSummary {
         val completed = entries.count { it.status == Status.COMPLETED }
         val delivered = entries.count { it.status == Status.DELIVERED }
         val totalQuantity = entries.sumOf { it.quantity ?: 0 }
         return ReportSummary(
-            label = label,
             completed = completed,
             delivered = delivered,
             totalQuantity = totalQuantity

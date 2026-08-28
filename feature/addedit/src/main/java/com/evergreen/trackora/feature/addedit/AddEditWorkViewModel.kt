@@ -11,6 +11,7 @@ import com.evergreen.trackora.domain.usecase.UpdateWorkEntryUseCase
 import com.evergreen.trackora.settings.CustomFields
 import com.evergreen.trackora.settings.CustomFieldsManager
 import com.evergreen.trackora.util.AppConstants
+import com.evergreen.trackora.util.PersianDigits
 import com.evergreen.trackora.util.WorkEntryValidator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -228,7 +229,10 @@ class AddEditWorkViewModel @Inject constructor(
                 )
             }
             try {
-                val quantity = currentState.quantityInput.toIntOrNull()
+                // The field preserves whichever digit system the user typed in,
+                // so normalise here: the database column must hold a number,
+                // not a script-dependent rendering of one.
+                val quantity = PersianDigits.toWestern(currentState.quantityInput).toIntOrNull()
                 val description = currentState.description.trim().takeIf { it.isNotBlank() }
                 val customField1 = currentState.customField1.trim().takeIf { it.isNotBlank() }
                 val customField2 = currentState.customField2.trim().takeIf { it.isNotBlank() }

@@ -30,6 +30,7 @@ import com.evergreen.trackora.domain.model.Status
 import com.evergreen.trackora.domain.model.WorkEntry
 import com.evergreen.trackora.ui.components.StatusPill
 import com.evergreen.trackora.ui.components.TrackoraScreenContainer
+import com.evergreen.trackora.ui.text.forUserContent
 
 /**
  * Screen for viewing all work entries with quick status filters.
@@ -165,7 +166,7 @@ private fun AllWorkListItem(
                 ) {
                     Text(
                         text = entry.title,
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleMedium.forUserContent(),
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis

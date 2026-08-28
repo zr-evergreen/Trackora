@@ -28,7 +28,7 @@
     <string name="action_save">ذخیره</string>
     <string name="action_select">انتخاب</string>
     <string name="action_cancel">لغو</string>
-    <string name="action_take_photo">عکس بگیر</string>
+    <string name="action_take_photo">گرفتن عکس</string>
     <string name="action_choose_from_gallery">انتخاب از گالری</string>
     <string name="action_remove_photo">حذف عکس</string>
     
@@ -41,5 +41,7 @@
     
     <!-- Errors -->
     <string name="error_title_required">عنوان ضروری است</string>
-    <string name="error_entry_not_found">رکورد یافت نشد</string>
+    <string name="error_entry_not_found">کار موردنظر پیدا نشد</string>
+
+    <string name="char_counter">%1$d/%2$d</string>
 </resources>

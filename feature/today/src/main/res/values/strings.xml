@@ -1,10 +1,25 @@
 <resources>
     <string name="today_title">Today</string>
-    <string name="today_date_format">EEEE, MMM d, yyyy</string>
     <string name="today_empty_title">No entries for today</string>
     <string name="today_empty_subtitle">Tap the ➕ button to add a work entry</string>
     <string name="today_summary">Summary</string>
     <string name="today_completed">Completed</string>
     <string name="today_delivered">Delivered</string>
     <string name="today_add_work_entry">Add Work Entry</string>
+    <!-- Wording must stay identical to qty_label in :feature:allwork, which
+         labels the same value on the All Work list. -->
+    <string name="qty_label">Qty: %1$d</string>
+
+    <!-- Status names. Wording must stay identical to filter_in_progress and
+         friends in :feature:allwork, which name the same three states. -->
+    <string name="status_in_progress">In Progress</string>
+    <string name="status_completed">Completed</string>
+    <string name="status_delivered">Delivered</string>
+
+    <!-- Short forms for the three-up status selector, which has room for a
+         couple of characters per chip. English initialises; Persian has no
+         initialising convention, so it abbreviates to a short whole word. -->
+    <string name="status_short_in_progress">IP</string>
+    <string name="status_short_completed">C</string>
+    <string name="status_short_delivered">D</string>
 </resources>

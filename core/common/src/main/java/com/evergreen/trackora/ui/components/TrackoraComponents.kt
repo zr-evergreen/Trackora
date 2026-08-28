@@ -100,7 +100,13 @@ private fun SummaryColumn(
         Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(14.dp))
-                .background(Color.White.copy(alpha = 0.9f))
+                // Must be a theme colour, not a literal. This tile was
+                // hardcoded to white while its label takes onSurfaceVariant
+                // from the scheme, so in dark mode a light label landed on a
+                // white tile and the two summary counts were unreadable.
+                // surface keeps the near-white tile in light mode and darkens
+                // with the scheme in dark mode.
+                .background(MaterialTheme.colorScheme.surface)
                 .padding(vertical = 12.dp, horizontal = 8.dp)
                 .fillMaxWidth(),
             contentAlignment = Alignment.Center

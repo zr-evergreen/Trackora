@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.DayOfWeek
 import java.time.LocalDate
 
 /**
@@ -288,5 +289,83 @@ class JalaliCalendarTest {
     @Test
     fun `JalaliDate toString is the slash separated form`() {
         assertEquals("1400/1/15", JalaliCalendar.JalaliDate(1400, 1, 15).toString())
+    }
+
+    // --- The Iranian week ---------------------------------------------------
+
+    /**
+     * The Iranian week starts on Saturday. `DayOfWeek` numbers from Monday,
+     * so the mapping is off by two and wraps — the kind of arithmetic that
+     * looks right and is wrong for two days of the week.
+     */
+    @Test
+    fun `Saturday is the first day of the Persian week and Friday the last`() {
+        // 2026-08-15 is a Saturday; the following six days complete the week.
+        val saturday = LocalDate.of(2026, 8, 15)
+        assertEquals(DayOfWeek.SATURDAY, saturday.dayOfWeek)
+
+        val expected = listOf(
+            DayOfWeek.SATURDAY to 0,
+            DayOfWeek.SUNDAY to 1,
+            DayOfWeek.MONDAY to 2,
+            DayOfWeek.TUESDAY to 3,
+            DayOfWeek.WEDNESDAY to 4,
+            DayOfWeek.THURSDAY to 5,
+            DayOfWeek.FRIDAY to 6,
+        )
+
+        expected.forEachIndexed { offset, (dayOfWeek, index) ->
+            val date = saturday.plusDays(offset.toLong())
+            assertEquals(dayOfWeek, date.dayOfWeek)
+            assertEquals("index of $dayOfWeek", index, JalaliCalendar.persianWeekdayIndex(date))
+        }
+    }
+
+    @Test
+    fun `weekday index stays within the week over a full year`() {
+        var date = LocalDate.of(2026, 1, 1)
+        repeat(366) {
+            val index = JalaliCalendar.persianWeekdayIndex(date)
+            assertTrue("index $index out of range on $date", index in 0..6)
+            date = date.plusDays(1)
+        }
+    }
+
+    @Test
+    fun `Persian weekday names line up with the Iranian week`() {
+        val saturday = LocalDate.of(2026, 8, 15)
+
+        val names = (0..6).map {
+            JalaliCalendar.getPersianWeekdayName(saturday.plusDays(it.toLong()))
+        }
+
+        assertEquals(
+            listOf("شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه"),
+            names
+        )
+    }
+
+    @Test
+    fun `only Friday counts as the Iranian weekend`() {
+        val saturday = LocalDate.of(2026, 8, 15)
+
+        (0..6).forEach { offset ->
+            val date = saturday.plusDays(offset.toLong())
+            val expected = date.dayOfWeek == DayOfWeek.FRIDAY
+
+            assertEquals(
+                "weekend flag for ${date.dayOfWeek}",
+                expected,
+                JalaliCalendar.isIranianWeekend(date)
+            )
+        }
+    }
+
+    @Test
+    fun `Saturday is not treated as a weekend the way it is in the West`() {
+        // The bug this guards against is reusing a Sat/Sun weekend rule.
+        assertFalse(JalaliCalendar.isIranianWeekend(LocalDate.of(2026, 8, 15))) // Saturday
+        assertFalse(JalaliCalendar.isIranianWeekend(LocalDate.of(2026, 8, 16))) // Sunday
+        assertTrue(JalaliCalendar.isIranianWeekend(LocalDate.of(2026, 8, 21)))  // Friday
     }
 }

@@ -41,7 +41,7 @@ object WorkEntryValidator {
             return ValidationResult.Valid // Quantity is optional
         }
 
-        val quantity = quantityInput.toIntOrNull()
+        val quantity = PersianDigits.toWestern(quantityInput).toIntOrNull()
         return when {
             quantity == null ->
                 ValidationResult.Invalid(AppConstants.Errors.QUANTITY_INVALID)
@@ -82,6 +82,13 @@ object WorkEntryValidator {
 
     /**
      * Sanitizes quantity input (removes non-digits).
+     *
+     * [Char.isDigit] is Unicode-aware, so Persian-Indic (`۱`) and Arabic-Indic
+     * (`١`) digits survive this filter. That is deliberate: the field keeps
+     * showing whichever digit system the user is typing in, and normalisation
+     * to Western digits happens at the parse boundary in [validateQuantity]
+     * and at the storage boundary in the add/edit view model. Converting here
+     * instead would flip the characters under the user's cursor mid-word.
      */
     fun sanitizeQuantity(input: String): String {
         return input.filter { it.isDigit() }
