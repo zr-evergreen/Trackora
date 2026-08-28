@@ -71,6 +71,12 @@ class WorkEntryRepositoryImpl @Inject constructor(
         return workEntryDao.getEntryCountByDateRange(startDate, endDate)
     }
     
+    override fun observeEntriesByStatus(status: Status): Flow<List<WorkEntry>> {
+        return workEntryDao.observeEntriesByStatus(status.name).map { entities ->
+            WorkEntryMapper.toDomainList(entities)
+        }
+    }
+
     override suspend fun getEntriesByStatus(status: Status): List<WorkEntry> {
         val entities = workEntryDao.getEntriesByStatus(status.name)
         return WorkEntryMapper.toDomainList(entities)
