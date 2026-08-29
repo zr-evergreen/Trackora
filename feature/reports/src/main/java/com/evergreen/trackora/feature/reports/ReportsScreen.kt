@@ -2,16 +2,17 @@ package com.evergreen.trackora.feature.reports
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -28,9 +29,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.evergreen.trackora.feature.reports.R
 import com.evergreen.trackora.ui.components.TrackoraErrorState
+import com.evergreen.trackora.ui.components.TrackoraFilterChip
+import com.evergreen.trackora.ui.components.TrackoraFilterRow
 import com.evergreen.trackora.ui.components.TrackoraLoadingState
+import com.evergreen.trackora.ui.components.TrackoraEmptyState
 import com.evergreen.trackora.ui.components.TrackoraScreenContainer
-import com.evergreen.trackora.ui.components.TrackoraSummaryCard
 import com.evergreen.trackora.ui.text.localizedNumber
 
 /**
@@ -103,7 +106,19 @@ fun ReportsScreen(
                 modifier = Modifier.padding(bottom = 8.dp)
             )
 
-            ReportsSummaryCard(summary = currentSummary)
+            if (!currentSummary.hasActivity && uiState.undeliveredCount == 0) {
+                // A grid of zeros looks like a broken screen. Say what is
+                // actually true: nothing was recorded in this window.
+                TrackoraEmptyState(
+                    title = stringResource(id = R.string.reports_empty_title),
+                    body = stringResource(id = R.string.reports_empty_body)
+                )
+            } else {
+                ReportsFigures(
+                    summary = currentSummary,
+                    undeliveredCount = uiState.undeliveredCount
+                )
+            }
         }
     }
 }
@@ -113,83 +128,140 @@ private fun RangeFilterRow(
     selectedRange: ReportsRange,
     onRangeSelected: (ReportsRange) -> Unit
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        FilterChip(
+    TrackoraFilterRow {
+        TrackoraFilterChip(
+            label = stringResource(id = R.string.reports_daily),
             selected = selectedRange == ReportsRange.DAILY,
-            onClick = { onRangeSelected(ReportsRange.DAILY) },
-            label = { Text(text = stringResource(id = R.string.reports_daily)) },
-            colors = FilterChipDefaults.filterChipColors()
+            onClick = { onRangeSelected(ReportsRange.DAILY) }
         )
-        FilterChip(
+        TrackoraFilterChip(
+            label = stringResource(id = R.string.reports_weekly),
             selected = selectedRange == ReportsRange.WEEKLY,
-            onClick = { onRangeSelected(ReportsRange.WEEKLY) },
-            label = { Text(text = stringResource(id = R.string.reports_weekly)) },
-            colors = FilterChipDefaults.filterChipColors()
+            onClick = { onRangeSelected(ReportsRange.WEEKLY) }
         )
-        FilterChip(
+        TrackoraFilterChip(
+            label = stringResource(id = R.string.reports_monthly),
             selected = selectedRange == ReportsRange.MONTHLY,
-            onClick = { onRangeSelected(ReportsRange.MONTHLY) },
-            label = { Text(text = stringResource(id = R.string.reports_monthly)) },
-            colors = FilterChipDefaults.filterChipColors()
+            onClick = { onRangeSelected(ReportsRange.MONTHLY) }
         )
     }
 }
 
+/**
+ * The figures for one window.
+ *
+ * ### What this replaces
+ *
+ * The previous card printed Completed, then Delivered, then Completed again
+ * and Total quantity — the same number twice in one card, in two different
+ * type sizes. It also had no empty state, so a user with no data saw a grid of
+ * zeros rather than an explanation.
+ *
+ * The figures now answer the questions a self-employed worker actually asks:
+ * how much did I finish, how many units was that, how does it compare with the
+ * period before, and — the one that costs money — how much is still sitting
+ * undelivered.
+ */
 @Composable
-private fun ReportsSummaryCard(summary: ReportSummary) {
-    TrackoraSummaryCard(
-        modifier = Modifier.fillMaxWidth(),
-        leftTitle = stringResource(id = R.string.reports_completed),
-        leftValue = localizedNumber(summary.completed),
-        rightTitle = stringResource(id = R.string.reports_delivered),
-        rightValue = localizedNumber(summary.delivered)
-    )
+private fun ReportsFigures(summary: ReportSummary, undeliveredCount: Int) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            // Intrinsic min height so a two-line delta on one tile does not
+            // leave the other visibly short beside it.
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            StatTile(
+                label = stringResource(id = R.string.reports_completed),
+                value = localizedNumber(summary.completed),
+                delta = summary.changeVsPrevious,
+                modifier = Modifier.weight(1f)
+            )
+            StatTile(
+                label = stringResource(id = R.string.reports_quantity),
+                value = localizedNumber(summary.totalQuantity),
+                modifier = Modifier.weight(1f)
+            )
+        }
 
-    Spacer(modifier = Modifier.height(12.dp))
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        SummaryStat(
-            label = stringResource(id = R.string.reports_completed),
-            value = localizedNumber(summary.completed),
-            modifier = Modifier.weight(1f)
-        )
-        SummaryStat(
-            label = stringResource(id = R.string.reports_quantity),
-            value = localizedNumber(summary.totalQuantity),
-            modifier = Modifier.weight(1f)
-        )
+        // Present-tense, not scoped to the selected window, so it is separated
+        // from the two figures above rather than sitting in the same row.
+        if (undeliveredCount > 0) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.primaryContainer
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(id = R.string.reports_awaiting_delivery),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        text = localizedNumber(undeliveredCount),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            }
+        }
     }
 }
 
+/**
+ * One figure, with an optional change against the previous period.
+ *
+ * The delta is plain text rather than a coloured arrow: for a pieceworker a
+ * quiet month is information, not a failure, and painting it red would be the
+ * app passing judgement on their week.
+ */
 @Composable
-private fun SummaryStat(
+private fun StatTile(
     label: String,
     value: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    delta: Int? = null,
 ) {
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally
+    Surface(
+        modifier = modifier.fillMaxHeight(),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceVariant
     ) {
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.Center
-        )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (delta != null && delta != 0) {
+                Text(
+                    text = stringResource(
+                        id = if (delta > 0) R.string.reports_delta_up else R.string.reports_delta_down,
+                        localizedNumber(kotlin.math.abs(delta))
+                    ),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+        }
     }
 }
-
-

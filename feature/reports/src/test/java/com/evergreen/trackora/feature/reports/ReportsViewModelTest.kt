@@ -2,30 +2,40 @@ package com.evergreen.trackora.feature.reports
 
 import com.evergreen.trackora.domain.model.Status
 import com.evergreen.trackora.domain.model.WorkEntry
+import com.evergreen.trackora.domain.usecase.GetUndeliveredWorkUseCase
 import com.evergreen.trackora.domain.usecase.GetWorkEntriesByDateRangeUseCase
-import com.evergreen.trackora.domain.usecase.GetWorkEntriesByDateUseCase
 import com.evergreen.trackora.util.AppConstants
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import java.time.LocalDate
 
+/**
+ * Tests for the rebuilt reports.
+ *
+ * The screen used to print the same figure twice and had no notion of a
+ * previous period. It now answers four questions — how much was finished, how
+ * many units, how that compares with the window before, and how much is still
+ * undelivered — so the arithmetic behind each is worth pinning down.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ReportsViewModelTest {
 
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
-    private val getWorkEntriesByDateUseCase: GetWorkEntriesByDateUseCase = mockk()
     private val getWorkEntriesByDateRangeUseCase: GetWorkEntriesByDateRangeUseCase = mockk()
+    private val getUndeliveredWorkUseCase: GetUndeliveredWorkUseCase = mockk()
 
     private val today: LocalDate = LocalDate.now()
 
@@ -33,178 +43,180 @@ class ReportsViewModelTest {
         id: Long,
         status: Status = Status.COMPLETED,
         quantity: Int? = null
-    ) = WorkEntry(
-        id = id,
-        title = "Entry $id",
-        status = status,
-        date = today,
-        quantity = quantity
-    )
+    ) = WorkEntry(id = id, title = "Entry $id", status = status, date = today, quantity = quantity)
 
     private fun viewModel() = ReportsViewModel(
-        getWorkEntriesByDateUseCase,
-        getWorkEntriesByDateRangeUseCase
+        getWorkEntriesByDateRangeUseCase,
+        getUndeliveredWorkUseCase
     )
 
-    /** Stubs today, the 7-day window and the 30-day window respectively. */
+    /**
+     * Stubs each window and the equal-length window preceding it.
+     *
+     * Every range is queried as a range now, today included — today..today —
+     * so that current and previous windows are built the same way.
+     */
     private fun stub(
-        daily: List<WorkEntry> = emptyList(),
-        weekly: List<WorkEntry> = emptyList(),
-        monthly: List<WorkEntry> = emptyList()
+        todayEntries: List<WorkEntry> = emptyList(),
+        yesterdayEntries: List<WorkEntry> = emptyList(),
+        weekEntries: List<WorkEntry> = emptyList(),
+        previousWeekEntries: List<WorkEntry> = emptyList(),
+        monthEntries: List<WorkEntry> = emptyList(),
+        previousMonthEntries: List<WorkEntry> = emptyList(),
+        undelivered: List<WorkEntry> = emptyList()
     ) {
-        every { getWorkEntriesByDateUseCase(today) } returns flowOf(daily)
+        every { getWorkEntriesByDateRangeUseCase(today, today) } returns flowOf(todayEntries)
+        every {
+            getWorkEntriesByDateRangeUseCase(today.minusDays(1), today.minusDays(1))
+        } returns flowOf(yesterdayEntries)
         every {
             getWorkEntriesByDateRangeUseCase(today.minusDays(6), today)
-        } returns flowOf(weekly)
+        } returns flowOf(weekEntries)
+        every {
+            getWorkEntriesByDateRangeUseCase(today.minusDays(13), today.minusDays(7))
+        } returns flowOf(previousWeekEntries)
         every {
             getWorkEntriesByDateRangeUseCase(today.minusDays(29), today)
-        } returns flowOf(monthly)
+        } returns flowOf(monthEntries)
+        every {
+            getWorkEntriesByDateRangeUseCase(today.minusDays(59), today.minusDays(30))
+        } returns flowOf(previousMonthEntries)
+        every { getUndeliveredWorkUseCase() } returns flowOf(undelivered)
     }
 
-    // --- Date ranges --------------------------------------------------------
+    // --- Counting -----------------------------------------------------------
 
     @Test
-    fun `the three windows are queried as today, the last 7 days and the last 30 days`() =
-        runTest {
-            // Both ranges are inclusive of today, so a 7-day window ends 6 days
-            // back and a 30-day window 29 days back. An off-by-one here is
-            // invisible in the UI but quietly wrong in every report.
-            stub()
-
-            viewModel()
-
-            io.mockk.verify { getWorkEntriesByDateUseCase(today) }
-            io.mockk.verify { getWorkEntriesByDateRangeUseCase(today.minusDays(6), today) }
-            io.mockk.verify { getWorkEntriesByDateRangeUseCase(today.minusDays(29), today) }
-        }
-
-    // --- Aggregation --------------------------------------------------------
-
-    @Test
-    fun `completed and delivered are counted separately`() = runTest {
+    fun `completed counts finished work whether or not it has been delivered`() = runTest {
+        // Delivering something does not un-complete it. Counting only COMPLETED
+        // would show a user's output falling as they hand work over.
         stub(
-            daily = listOf(
-                entry(1, Status.COMPLETED),
+            todayEntries = listOf(
+                entry(1, Status.IN_PROGRESS),
                 entry(2, Status.COMPLETED),
-                entry(3, Status.DELIVERED),
-                entry(4, Status.IN_PROGRESS)
+                entry(3, Status.DELIVERED)
             )
         )
 
-        val daily = viewModel().uiState.value.daily
+        val state = viewModel().uiState.value
 
-        assertEquals(2, daily.completed)
-        assertEquals(1, daily.delivered)
+        assertEquals(2, state.daily.completed)
     }
 
     @Test
-    fun `in-progress entries count towards neither total`() = runTest {
-        stub(daily = List(5) { entry(it.toLong(), Status.IN_PROGRESS) })
-
-        val daily = viewModel().uiState.value.daily
-
-        assertEquals(0, daily.completed)
-        assertEquals(0, daily.delivered)
-    }
-
-    @Test
-    fun `quantities are summed across all entries regardless of status`() = runTest {
+    fun `quantity sums the window and treats a missing quantity as zero`() = runTest {
         stub(
-            daily = listOf(
-                entry(1, Status.COMPLETED, quantity = 3),
-                entry(2, Status.DELIVERED, quantity = 4),
-                entry(3, Status.IN_PROGRESS, quantity = 5)
-            )
-        )
-
-        assertEquals(12, viewModel().uiState.value.daily.totalQuantity)
-    }
-
-    @Test
-    fun `a null quantity contributes zero rather than failing`() = runTest {
-        stub(
-            daily = listOf(
-                entry(1, quantity = 7),
+            todayEntries = listOf(
+                entry(1, quantity = 12),
                 entry(2, quantity = null),
-                entry(3, quantity = null)
+                entry(3, quantity = 30)
             )
         )
 
-        assertEquals(7, viewModel().uiState.value.daily.totalQuantity)
+        assertEquals(42, viewModel().uiState.value.daily.totalQuantity)
+    }
+
+    // --- Comparison with the previous window --------------------------------
+
+    @Test
+    fun `a better week reports the difference as a rise`() = runTest {
+        stub(
+            weekEntries = listOf(entry(1), entry(2), entry(3)),
+            previousWeekEntries = listOf(entry(4))
+        )
+
+        assertEquals(2, viewModel().uiState.value.weekly.changeVsPrevious)
     }
 
     @Test
-    fun `an empty window reports zeroes`() = runTest {
+    fun `a worse month reports a negative difference`() = runTest {
+        stub(
+            monthEntries = listOf(entry(1)),
+            previousMonthEntries = listOf(entry(2), entry(3), entry(4))
+        )
+
+        assertEquals(-2, viewModel().uiState.value.monthly.changeVsPrevious)
+    }
+
+    @Test
+    fun `two empty windows report no comparison rather than a change of zero`() = runTest {
+        // "0 fewer than the period before" is noise on a screen that should
+        // simply say nothing was recorded.
+        stub()
+
+        assertNull(viewModel().uiState.value.daily.changeVsPrevious)
+    }
+
+    @Test
+    fun `an unchanged period reports zero, which the screen then hides`() = runTest {
+        stub(todayEntries = listOf(entry(1)), yesterdayEntries = listOf(entry(2)))
+
+        assertEquals(0, viewModel().uiState.value.daily.changeVsPrevious)
+    }
+
+    // --- Undelivered --------------------------------------------------------
+
+    @Test
+    fun `undelivered is a present-tense figure, not scoped to the window`() = runTest {
+        // The job was finished long before any of these windows and is still
+        // uncollected; it must not disappear because the user picked "today".
+        stub(undelivered = listOf(entry(9), entry(10)))
+
+        val state = viewModel().uiState.value
+
+        assertEquals(2, state.undeliveredCount)
+        assertEquals(0, state.daily.completed)
+    }
+
+    // --- States -------------------------------------------------------------
+
+    @Test
+    fun `an empty database is reported as no activity`() = runTest {
         stub()
 
         val state = viewModel().uiState.value
 
-        assertEquals(0, state.daily.completed)
-        assertEquals(0, state.daily.delivered)
-        assertEquals(0, state.daily.totalQuantity)
-    }
-
-    // --- The three windows are kept distinct --------------------------------
-
-    @Test
-    fun `each window is summarised from its own entries`() = runTest {
-        stub(
-            daily = listOf(entry(1, Status.COMPLETED, quantity = 1)),
-            weekly = List(5) { entry(it.toLong(), Status.COMPLETED, quantity = 2) },
-            monthly = List(20) { entry(it.toLong(), Status.DELIVERED, quantity = 3) }
-        )
-
-        val state = viewModel().uiState.value
-
-        assertEquals(1, state.daily.completed)
-        assertEquals(1, state.daily.totalQuantity)
-
-        assertEquals(5, state.weekly.completed)
-        assertEquals(10, state.weekly.totalQuantity)
-
-        assertEquals(20, state.monthly.delivered)
-        assertEquals(0, state.monthly.completed)
-        assertEquals(60, state.monthly.totalQuantity)
+        assertFalse(state.isLoading)
+        assertFalse(state.daily.hasActivity)
+        assertEquals(0, state.undeliveredCount)
     }
 
     @Test
-    fun `loading is cleared once all three windows have reported`() = runTest {
-        stub(daily = listOf(entry(1)))
+    fun `recorded work counts as activity`() = runTest {
+        stub(todayEntries = listOf(entry(1, quantity = 5)))
 
-        val state = viewModel().uiState.value
+        assertTrue(viewModel().uiState.value.daily.hasActivity)
+    }
+
+    @Test
+    fun `a failing query surfaces an error and stops loading`() = runTest {
+        every { getWorkEntriesByDateRangeUseCase(any(), any()) } returns
+            flow { throw RuntimeException("db gone") }
+        every { getUndeliveredWorkUseCase() } returns flowOf(emptyList())
+
+        val viewModel = viewModel()
+        advanceUntilIdle()
+        val state = viewModel.uiState.value
 
         assertFalse(state.isLoading)
-        assertNull(state.errorMessage)
-    }
-
-    // --- Error path ---------------------------------------------------------
-
-    @Test
-    fun `a failure in any window sets the error and clears loading`() = runTest {
-        every { getWorkEntriesByDateUseCase(today) } returns flowOf(emptyList())
-        every {
-            getWorkEntriesByDateRangeUseCase(today.minusDays(6), today)
-        } returns flow { throw RuntimeException("range query failed") }
-        every {
-            getWorkEntriesByDateRangeUseCase(today.minusDays(29), today)
-        } returns flowOf(emptyList())
-
-        val state = viewModel().uiState.value
-
-        assertEquals("range query failed", state.errorMessage)
-        assertFalse(state.isLoading)
+        assertEquals("db gone", state.errorMessage)
     }
 
     @Test
-    fun `a failure without a message falls back to the generic error`() = runTest {
-        every { getWorkEntriesByDateUseCase(today) } returns flow { throw RuntimeException() }
-        every {
-            getWorkEntriesByDateRangeUseCase(any(), any())
-        } returns flowOf(emptyList())
+    fun `retry clears the error before reloading`() = runTest {
+        every { getWorkEntriesByDateRangeUseCase(any(), any()) } returns
+            flow { throw RuntimeException(AppConstants.Errors.FAILED_TO_LOAD_ENTRIES) }
+        every { getUndeliveredWorkUseCase() } returns flowOf(emptyList())
 
-        assertEquals(
-            AppConstants.Errors.FAILED_TO_LOAD_ENTRIES,
-            viewModel().uiState.value.errorMessage
-        )
+        val viewModel = viewModel()
+        advanceUntilIdle()
+        assertEquals(AppConstants.Errors.FAILED_TO_LOAD_ENTRIES, viewModel.uiState.value.errorMessage)
+
+        stub()
+        viewModel.retry()
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.errorMessage)
+        assertFalse(viewModel.uiState.value.isLoading)
     }
 }

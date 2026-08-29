@@ -6,6 +6,11 @@
     <string name="reports_completed">تکمیل‌شده</string>
     <string name="reports_delivered">تحویل‌شده</string>
     <string name="reports_quantity">تعداد کل</string>
+    <string name="reports_awaiting_delivery">در انتظار تحویل</string>
+    <string name="reports_delta_up">%1$s بیشتر از دوره قبل</string>
+    <string name="reports_delta_down">%1$s کمتر از دوره قبل</string>
+    <string name="reports_empty_title">هنوز چیزی ثبت نشده</string>
+    <string name="reports_empty_body">کارهایی که ثبت کنید اینجا خلاصه می‌شود.</string>
 </resources>
 
 

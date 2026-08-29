@@ -4,8 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.evergreen.trackora.domain.model.Status
 import com.evergreen.trackora.domain.model.WorkEntry
+import com.evergreen.trackora.domain.usecase.GetUndeliveredWorkUseCase
 import com.evergreen.trackora.domain.usecase.GetWorkEntriesByDateRangeUseCase
-import com.evergreen.trackora.domain.usecase.GetWorkEntriesByDateUseCase
 import com.evergreen.trackora.util.AppConstants
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,8 +24,8 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class ReportsViewModel @Inject constructor(
-    private val getWorkEntriesByDateUseCase: GetWorkEntriesByDateUseCase,
-    private val getWorkEntriesByDateRangeUseCase: GetWorkEntriesByDateRangeUseCase
+    private val getWorkEntriesByDateRangeUseCase: GetWorkEntriesByDateRangeUseCase,
+    private val getUndeliveredWorkUseCase: GetUndeliveredWorkUseCase
 ) : ViewModel() {
 
     private val today: LocalDate = LocalDate.now()
@@ -45,21 +45,21 @@ class ReportsViewModel @Inject constructor(
 
     private fun loadReports() {
         viewModelScope.launch {
+            // Each window is paired with the equal-length window before it, so
+            // the screen can report a direction of travel rather than a bare
+            // total. Yesterday for today, the previous seven days for the last
+            // seven, and so on.
             combine(
-                getWorkEntriesByDateUseCase(today).map { entries ->
-                    toSummary(entries = entries)
-                },
-                getWorkEntriesByDateRangeUseCase(today.minusDays(6), today).map { entries ->
-                    toSummary(entries = entries)
-                },
-                getWorkEntriesByDateRangeUseCase(today.minusDays(29), today).map { entries ->
-                    toSummary(entries = entries)
-                }
-            ) { daily, weekly, monthly ->
+                window(today, today, today.minusDays(1), today.minusDays(1)),
+                window(today.minusDays(6), today, today.minusDays(13), today.minusDays(7)),
+                window(today.minusDays(29), today, today.minusDays(59), today.minusDays(30)),
+                getUndeliveredWorkUseCase()
+            ) { daily, weekly, monthly, undelivered ->
                 ReportsUiState(
                     daily = daily,
                     weekly = weekly,
                     monthly = monthly,
+                    undeliveredCount = undelivered.size,
                     isLoading = false
                 )
             }
@@ -70,26 +70,34 @@ class ReportsViewModel @Inject constructor(
                             ?: AppConstants.Errors.FAILED_TO_LOAD_ENTRIES
                     )
                 }
-                .collect { state ->
-                    _uiState.value = state
-                }
+                .collect { state -> _uiState.value = state }
         }
     }
 
+    /** Figures for [start]..[end], compared against [prevStart]..[prevEnd]. */
+    private fun window(
+        start: LocalDate,
+        end: LocalDate,
+        prevStart: LocalDate,
+        prevEnd: LocalDate
+    ) = combine(
+        getWorkEntriesByDateRangeUseCase(start, end),
+        getWorkEntriesByDateRangeUseCase(prevStart, prevEnd)
+    ) { current, previous ->
+        toSummary(current).copy(
+            previousCompleted = previous.count { it.status != Status.IN_PROGRESS }
+        )
+    }
+
     /**
-     * Converts a list of work entries into a summary report.
-     * Extracted to a separate method for better testability and Single Responsibility.
+     * Completed counts finished work whether or not it has been handed over —
+     * delivering something does not un-complete it, and a report that dropped
+     * delivered work would show a user's output falling as they hand it over.
      */
     private fun toSummary(entries: List<WorkEntry>): ReportSummary {
-        val completed = entries.count { it.status == Status.COMPLETED }
-        val delivered = entries.count { it.status == Status.DELIVERED }
-        val totalQuantity = entries.sumOf { it.quantity ?: 0 }
         return ReportSummary(
-            completed = completed,
-            delivered = delivered,
-            totalQuantity = totalQuantity
+            completed = entries.count { it.status != Status.IN_PROGRESS },
+            totalQuantity = entries.sumOf { it.quantity ?: 0 }
         )
     }
 }
-
-

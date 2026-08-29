@@ -6,6 +6,11 @@
     <string name="reports_completed">Completed</string>
     <string name="reports_delivered">Delivered</string>
     <string name="reports_quantity">Total quantity</string>
+    <string name="reports_awaiting_delivery">Still waiting to be delivered</string>
+    <string name="reports_delta_up">%1$s more than the period before</string>
+    <string name="reports_delta_down">%1$s fewer than the period before</string>
+    <string name="reports_empty_title">Nothing recorded yet</string>
+    <string name="reports_empty_body">Work you record will be summarised here.</string>
 </resources>
 
 
