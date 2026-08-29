@@ -102,3 +102,70 @@ preserve, and is tested against:
 - `Icons.AutoMirrored` for directional glyphs; `autoMirrored` on directional vectors
 - `TextDirection.Content` on any text the user typed
 - Dark mode contrast, and no colour literals outside the theme
+
+## Evaluated and deferred: a Customer entity
+
+Considered for V1, and deliberately **deferred to V2**. The evaluation is
+recorded here so it does not have to be repeated.
+
+### The proposal
+
+Promote the free-form customer text into a real entity:
+
+```
+Customer → Work entries → quantity → status → delivery → history
+```
+
+### What it would genuinely enable
+
+| Capability | Available today? |
+| --- | --- |
+| Find everything for one customer | **Yes** — search on All Work already does this |
+| Per-customer totals | No |
+| Autocomplete while typing a name | No |
+| Rename a customer once, everywhere | No |
+
+Only two of the four are actually missing, and neither is part of the core
+loop. The one users ask for first — "show me this customer's work" — was
+delivered by search at a fraction of the cost.
+
+### What it would cost
+
+**The fields are not semantically customers.** All three custom fields are
+user-renamed; field one ships with the placeholder *"e.g. Client Name"* as a
+*suggestion*. A user is free to name it Fabric, Machine or Invoice, and some
+will. Promoting field one to a Customer entity silently reinterprets data the
+app explicitly told the user was theirs to define, and breaks the flexibility
+that makes the fields worth having.
+
+**Deduplication is not mechanisable.** Real logs contain «کریمی» and «كریمی» —
+Persian keheh against Arabic kaf, visually identical, different code points —
+along with «آقای کریمی» and bare «کریمی». Folding can *find* those (see
+`PersianSearch`), but deciding whether two spellings are one person is a
+judgement only the user can make. A migration that guesses merges records
+wrongly and silently.
+
+**The UI grows a whole second object.** Picker, create, edit, delete, and a
+merge-duplicates flow — plus an answer to "what happens to this customer's
+orders when the customer is deleted". That is a CRM, and this app is a
+day-book.
+
+### Decision
+
+Defer. The V1 product manages **work**, and a customer is an attribute of a
+piece of work rather than a thing to be administered.
+
+### The cheaper step that comes first
+
+If customer handling needs improving before a full entity is justified, the
+next move is **suggesting previously-used values** while typing a custom
+field. It removes typos and drift, makes per-customer search reliable, and
+needs no schema change, no migration and no new screens. That belongs in V1.1
+and should be tried before anything heavier.
+
+### What would change the decision
+
+A Customer entity earns its place when users need per-customer **money** —
+what is owed, what has been paid. That is a different product promise from a
+work log, and it should be entered deliberately rather than arrived at by
+promoting a text field.
