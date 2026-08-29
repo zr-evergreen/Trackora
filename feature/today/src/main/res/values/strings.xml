@@ -22,7 +22,7 @@
     <string name="status_short_in_progress">IP</string>
     <string name="status_short_completed">C</string>
     <string name="status_short_delivered">D</string>
-    <string name="today_quick_add_hint">What did you work on?</string>
+    <string name="today_quick_add_hint">What did you do?</string>
     <string name="today_quick_add_action">Add</string>
     <string name="today_section_undelivered">Waiting to be delivered</string>
     <string name="today_section_today">Today’s work</string>
@@ -32,4 +32,6 @@
     <string name="today_empty_body">Add the first job of the day above.</string>
     <string name="today_summary_line">%1$d finished · %2$d items</string>
     <string name="action_mark_complete">Completed</string>
+    <string name="today_quick_add_qty">Qty</string>
+    <string name="today_see_all_undelivered">See all %1$d waiting</string>
 </resources>

@@ -77,6 +77,14 @@ fun NavGraph(
             // Feature navigation graphs
             todayNavigation(
                 contentPadding = paddingValues,
+                // The band shows only the oldest few; the rest live in the
+                // history, where the Completed filter and search already exist.
+                onSeeAllUndelivered = {
+                    navController.navigate(AllWorkRoute) {
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                },
                 // Rows on Today are now tappable. Previously the only way to
                 // open an entry was via All Work, which users had no reason to
                 // discover.

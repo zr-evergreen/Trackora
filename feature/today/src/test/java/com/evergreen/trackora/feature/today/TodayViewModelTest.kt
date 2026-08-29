@@ -426,4 +426,78 @@ class TodayViewModelTest {
         // Pressing done on an empty field is a change of mind, not a mistake.
         assertNull(viewModel.uiState.value.errorMessage)
     }
+
+    @Test
+    fun `quick add stores the quantity when one is given`() = runTest {
+        every { getWorkEntriesByDateUseCase(any()) } returns flowOf(emptyList())
+        every { getUndeliveredWorkUseCase() } returns flowOf(emptyList())
+        val captured = slot<WorkEntry>()
+        coEvery { insertWorkEntryUseCase(capture(captured)) } returns 1L
+
+        val viewModel = viewModel()
+        advanceUntilIdle()
+        viewModel.quickAdd("Hem trousers", 12)
+        advanceUntilIdle()
+
+        // Quantity is what a pieceworker bills on and what Reports totals, so
+        // the fast capture path has to be able to carry it.
+        assertEquals(12, captured.captured.quantity)
+    }
+
+    @Test
+    fun `quick add without a quantity leaves it null rather than zero`() = runTest {
+        every { getWorkEntriesByDateUseCase(any()) } returns flowOf(emptyList())
+        every { getUndeliveredWorkUseCase() } returns flowOf(emptyList())
+        val captured = slot<WorkEntry>()
+        coEvery { insertWorkEntryUseCase(capture(captured)) } returns 1L
+
+        val viewModel = viewModel()
+        advanceUntilIdle()
+        viewModel.quickAdd("Hem trousers", null)
+        advanceUntilIdle()
+
+        // Zero would be a claim that nothing was produced; null is "not counted".
+        assertNull(captured.captured.quantity)
+    }
+
+    // --- Undelivered band cap -----------------------------------------------
+
+    @Test
+    fun `the band shows only the oldest few but counts them all`() = runTest {
+        val many = (1..10).map {
+            WorkEntry(
+                id = it.toLong(), title = "Job $it", status = Status.COMPLETED,
+                date = LocalDate.of(2026, 8, 1).plusDays(it.toLong())
+            )
+        }
+        every { getWorkEntriesByDateUseCase(any()) } returns flowOf(emptyList())
+        every { getUndeliveredWorkUseCase() } returns flowOf(many)
+
+        val viewModel = viewModel()
+        advanceUntilIdle()
+        val state = viewModel.uiState.value
+
+        // An uncapped band buries today's work under months of history.
+        assertEquals(3, state.undeliveredPreview.size)
+        assertTrue(state.hasMoreUndelivered)
+        // The header still tells the truth about how much is owed.
+        assertEquals(10, state.undeliveredCount)
+        // Oldest first: those are the ones worth chasing.
+        assertEquals(listOf(1L, 2L, 3L), state.undeliveredPreview.map { it.id })
+    }
+
+    @Test
+    fun `a short band offers no see-all`() = runTest {
+        every { getWorkEntriesByDateUseCase(any()) } returns flowOf(emptyList())
+        every { getUndeliveredWorkUseCase() } returns flowOf(
+            listOf(WorkEntry(id = 1, title = "One", status = Status.COMPLETED,
+                date = LocalDate.of(2026, 8, 28)))
+        )
+
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.hasMoreUndelivered)
+        assertEquals(1, viewModel.uiState.value.undeliveredPreview.size)
+    }
 }

@@ -20,7 +20,7 @@
     <string name="status_short_in_progress">جاری</string>
     <string name="status_short_completed">تکمیل</string>
     <string name="status_short_delivered">تحویل</string>
-    <string name="today_quick_add_hint">چه کاری انجام دادید؟</string>
+    <string name="today_quick_add_hint">چه کاری انجام شد؟</string>
     <string name="today_quick_add_action">افزودن</string>
     <string name="today_section_undelivered">در انتظار تحویل</string>
     <string name="today_section_today">کارهای امروز</string>
@@ -30,4 +30,6 @@
     <string name="today_empty_body">اولین کار امروز را از بالا اضافه کنید.</string>
     <string name="today_summary_line">%1$d کار تمام‌شده · %2$d عدد</string>
     <string name="action_mark_complete">تکمیل شد</string>
+    <string name="today_quick_add_qty">تعداد</string>
+    <string name="today_see_all_undelivered">دیدن همه %1$d مورد</string>
 </resources>

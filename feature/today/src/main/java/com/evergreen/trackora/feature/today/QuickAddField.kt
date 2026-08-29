@@ -1,6 +1,8 @@
 package com.evergreen.trackora.feature.today
 
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardActions
@@ -25,8 +27,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import com.evergreen.trackora.util.PersianDigits
 import com.evergreen.trackora.ui.text.forUserContent
 
 /**
@@ -46,35 +50,55 @@ import com.evergreen.trackora.ui.text.forUserContent
  * keeping focus, so a burst of entries is a burst of typing rather than a
  * sequence of round trips. The keyboard never closes between items.
  *
- * A title is the only thing captured. Everything else takes a default — in
- * progress, dated today, no quantity — because asking for more here would
- * rebuild the form this is meant to avoid. Quantity and the rest stay one tap
- * away by opening the entry.
+ * ### Why quantity is here and nothing else is
+ *
+ * Status, date, photo and the custom fields all take defaults, because asking
+ * for them would rebuild the form this exists to avoid. Quantity is the
+ * exception, and it earns the exception: work in Trackora is counted in units,
+ * Reports leads with the total, and a pieceworker's billable number is the
+ * count. Capturing a title without it produces a record that cannot answer the
+ * question the user opened the app to answer.
+ *
+ * It is optional and visually secondary — narrow, unlabelled until focused,
+ * and skipped entirely by pressing Done from the title.
+ *
+ * Deliberately not parsed out of the title. Reading a trailing number would
+ * turn "سفارش Nike ۴۲" into a job called «سفارش Nike» with a quantity of 42,
+ * and order numbers in titles are common.
  *
  * Blank input is ignored rather than rejected: pressing Done on an empty field
  * is a user changing their mind, not an error worth a message.
  */
 @Composable
 fun QuickAddField(
-    onAdd: (String) -> Unit,
+    onAdd: (String, Int?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var text by rememberSaveable { mutableStateOf("") }
+    var quantity by rememberSaveable { mutableStateOf("") }
     val focusRequester = remember { FocusRequester() }
 
     fun commit() {
         val trimmed = text.trim()
         if (trimmed.isNotEmpty()) {
-            onAdd(trimmed)
+            // Normalised because the field accepts Persian digits, which is
+            // what a Persian keyboard produces; the column stores a number.
+            onAdd(trimmed, PersianDigits.toWestern(quantity).toIntOrNull())
             text = ""
+            quantity = ""
         }
     }
 
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
     OutlinedTextField(
         value = text,
         onValueChange = { text = it },
-        modifier = modifier
-            .fillMaxWidth()
+        modifier = Modifier
+            .weight(1f)
             .focusRequester(focusRequester),
         placeholder = { Text(stringResource(id = R.string.today_quick_add_hint)) },
         singleLine = true,
@@ -102,4 +126,25 @@ fun QuickAddField(
             unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
         )
     )
+
+        OutlinedTextField(
+            value = quantity,
+            // Digit-only, so a stray letter cannot make the field unparseable.
+            // isDigit is Unicode-aware, which is what lets Persian digits through.
+            onValueChange = { input -> quantity = input.filter { it.isDigit() }.take(6) },
+            modifier = Modifier.width(76.dp),
+            placeholder = { Text(stringResource(id = R.string.today_quick_add_qty)) },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Number,
+                imeAction = ImeAction.Done
+            ),
+            keyboardActions = KeyboardActions(onDone = { commit() }),
+            shape = MaterialTheme.shapes.medium,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+            )
+        )
+    }
 }

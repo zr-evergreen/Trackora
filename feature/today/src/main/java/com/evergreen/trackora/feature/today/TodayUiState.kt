@@ -25,6 +25,21 @@ data class TodayUiState(
 
     val undeliveredCount: Int get() = undelivered.size
 
+    /**
+     * The oldest few undelivered jobs, which is all the band shows.
+     *
+     * Realistic data made the need obvious: a log with a few months of history
+     * had 144 items waiting, and an uncapped band turned the home screen into
+     * an endless list with today's work unreachable below it. The band exists
+     * to say "these need chasing", and the oldest are the ones that do. The
+     * full set lives in All Work, which already has the filter and the search.
+     */
+    val undeliveredPreview: List<WorkEntry>
+        get() = undelivered.take(UNDELIVERED_PREVIEW_LIMIT)
+
+    val hasMoreUndelivered: Boolean
+        get() = undelivered.size > UNDELIVERED_PREVIEW_LIMIT
+
     /** Finished today — the number a user checks at closing time. */
     val completedToday: Int
         get() = todayEntries.count { it.status == Status.COMPLETED || it.status == Status.DELIVERED }
@@ -33,3 +48,6 @@ data class TodayUiState(
     val quantityToday: Int
         get() = todayEntries.sumOf { it.quantity ?: 0 }
 }
+
+/** Deliberately small: the band is a prompt to act, not a list to work through. */
+private const val UNDELIVERED_PREVIEW_LIMIT = 3

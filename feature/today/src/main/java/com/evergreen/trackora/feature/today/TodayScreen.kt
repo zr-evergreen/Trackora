@@ -18,6 +18,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -70,6 +71,7 @@ fun TodayScreen(
     viewModel: TodayViewModel = hiltViewModel(),
     contentPadding: PaddingValues = PaddingValues(),
     onEntryClick: (Long) -> Unit = {},
+    onSeeAllUndelivered: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val today = LocalDate.now()
@@ -132,7 +134,8 @@ fun TodayScreen(
                 else -> TodayList(
                     uiState = uiState,
                     onAdvance = viewModel::advanceStatus,
-                    onEntryClick = onEntryClick
+                    onEntryClick = onEntryClick,
+                    onSeeAllUndelivered = onSeeAllUndelivered
                 )
             }
         }
@@ -151,6 +154,7 @@ private fun TodayList(
     uiState: TodayUiState,
     onAdvance: (WorkEntry) -> Unit,
     onEntryClick: (Long) -> Unit,
+    onSeeAllUndelivered: () -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -164,13 +168,29 @@ private fun TodayList(
                     emphasised = true
                 )
             }
-            items(items = uiState.undelivered, key = { "u-${it.id}" }) { entry ->
+            items(items = uiState.undeliveredPreview, key = { "u-${it.id}" }) { entry ->
                 UndeliveredRow(
                     entry = entry,
                     onDeliver = { onAdvance(entry) },
                     onClick = { onEntryClick(entry.id) }
                 )
             }
+            if (uiState.hasMoreUndelivered) {
+                item(key = "undelivered-more") {
+                    TextButton(
+                        onClick = onSeeAllUndelivered,
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp)
+                    ) {
+                        Text(
+                            text = stringResource(
+                                id = R.string.today_see_all_undelivered,
+                                uiState.undeliveredCount
+                            )
+                        )
+                    }
+                }
+            }
+
             item(key = "undelivered-gap") { Spacer(modifier = Modifier.height(20.dp)) }
         }
 

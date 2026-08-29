@@ -11,12 +11,14 @@ import androidx.compose.foundation.layout.PaddingValues
  */
 fun NavGraphBuilder.todayNavigation(
     contentPadding: PaddingValues,
+    onSeeAllUndelivered: () -> Unit = {},
     onEntryClick: (Long) -> Unit
 ) {
     composable<TodayRoute> {
         TodayScreen(
             viewModel = hiltViewModel(),
             contentPadding = contentPadding,
+            onSeeAllUndelivered = onSeeAllUndelivered,
             onEntryClick = onEntryClick
         )
     }

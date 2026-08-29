@@ -143,9 +143,12 @@ class TodayViewModel @Inject constructor(
      * before the user forgets it. Quantity and the rest are a tap away in the
      * detail screen, and adding them here would defeat the feature.
      */
-    fun quickAdd(title: String) {
+    fun quickAdd(title: String, quantity: Int? = null) {
+        // Blank is a change of mind, not an error: pressing Done on an empty
+        // field should do nothing rather than raise a message, which is why
+        // this returns instead of delegating to addWorkEntry's validation.
         if (title.isBlank()) return
-        addWorkEntry(title = title)
+        addWorkEntry(title = title, quantity = quantity)
     }
 
     /**
