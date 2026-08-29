@@ -147,6 +147,7 @@ dependencies {
     // WorkManager
     implementation(libs.work.runtime.ktx)
     implementation(libs.hilt.work)
+    kapt(libs.androidx.hilt.compiler)
 
     // Testing
     testImplementation(libs.junit)
