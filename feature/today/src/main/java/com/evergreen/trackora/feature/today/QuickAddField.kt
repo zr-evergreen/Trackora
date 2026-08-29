@@ -1,5 +1,6 @@
 package com.evergreen.trackora.feature.today
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.width
@@ -31,6 +32,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.evergreen.trackora.util.PersianDigits
+import com.evergreen.trackora.ui.isLargeTextScale
 import com.evergreen.trackora.ui.text.forUserContent
 
 /**
@@ -89,17 +91,19 @@ fun QuickAddField(
         }
     }
 
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+    val stacked = isLargeTextScale()
+
+    // Side by side the quantity field is fixed-width, and a fixed width with
+    // scaled text clips: at 1.5x «تعداد» broke across two lines inside a 76dp
+    // box. Stacking gives it the full width instead of shrinking the type.
+    CaptureLayout(
+        stacked = stacked,
+        modifier = modifier.fillMaxWidth()
+    ) { titleModifier, quantityModifier ->
     OutlinedTextField(
         value = text,
         onValueChange = { text = it },
-        modifier = Modifier
-            .weight(1f)
-            .focusRequester(focusRequester),
+        modifier = titleModifier.focusRequester(focusRequester),
         placeholder = { Text(stringResource(id = R.string.today_quick_add_hint)) },
         singleLine = true,
         // User content: the title may be Persian, Latin or both, so it resolves
@@ -132,7 +136,7 @@ fun QuickAddField(
             // Digit-only, so a stray letter cannot make the field unparseable.
             // isDigit is Unicode-aware, which is what lets Persian digits through.
             onValueChange = { input -> quantity = input.filter { it.isDigit() }.take(6) },
-            modifier = Modifier.width(76.dp),
+            modifier = quantityModifier,
             placeholder = { Text(stringResource(id = R.string.today_quick_add_qty)) },
             singleLine = true,
             keyboardOptions = KeyboardOptions(
@@ -146,5 +150,34 @@ fun QuickAddField(
                 unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
             )
         )
+    }
+}
+
+/**
+ * Lays the capture fields out in a row, or stacked when text is large.
+ *
+ * Extracted so the branch is stated once and both children read the same
+ * `stacked` flag, rather than each guessing at the layout it is inside.
+ */
+@Composable
+private fun CaptureLayout(
+    stacked: Boolean,
+    modifier: Modifier = Modifier,
+    content: @Composable (titleModifier: Modifier, quantityModifier: Modifier) -> Unit,
+) {
+    if (stacked) {
+        Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            content(Modifier.fillMaxWidth(), Modifier.fillMaxWidth())
+        }
+    } else {
+        Row(
+            modifier = modifier,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // weight only exists inside RowScope, which is why the modifiers
+            // are handed to the children rather than chosen by them.
+            content(Modifier.weight(1f), Modifier.width(76.dp))
+        }
     }
 }

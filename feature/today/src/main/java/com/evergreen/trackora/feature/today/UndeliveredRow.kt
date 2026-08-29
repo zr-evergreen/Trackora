@@ -17,10 +17,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.evergreen.trackora.domain.model.WorkEntry
+import com.evergreen.trackora.ui.isLargeTextScale
 import com.evergreen.trackora.ui.text.forUserContent
 import com.evergreen.trackora.ui.text.localizedDate
 import com.evergreen.trackora.ui.text.localizedNumber
@@ -60,50 +63,85 @@ fun UndeliveredRow(
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = entry.title,
-                    style = MaterialTheme.typography.titleSmall.forUserContent(),
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = localizedDate(entry.date),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    entry.quantity?.let { quantity ->
-                        Text(
-                            text = stringResource(id = R.string.qty_label, quantity),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
+        val stacked = isLargeTextScale()
 
-            Button(
-                onClick = onDeliver,
-                // Long Persian labels and large font scales both need room to
-                // grow; the button wraps rather than truncating or squeezing
-                // the title beside it.
-                modifier = Modifier.widthIn(min = 96.dp),
-                contentPadding = ButtonDefaults.ContentPadding
+        // At large text the label and the button cannot share a line at 320dp:
+        // the button was being clipped at the card edge. Stacking keeps both at
+        // full size rather than shrinking either.
+        if (stacked) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                UndeliveredDetails(entry = entry)
+                DeliverButton(onDeliver = onDeliver, entryTitle = entry.title, modifier = Modifier.fillMaxWidth())
+            }
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                UndeliveredDetails(entry = entry, modifier = Modifier.weight(1f))
+                DeliverButton(onDeliver = onDeliver, entryTitle = entry.title)
+            }
+        }
+    }
+}
+
+@Composable
+private fun UndeliveredDetails(entry: WorkEntry, modifier: Modifier = Modifier) {
+    // One stop per job rather than three: title, date and quantity describe
+    // the same thing.
+    Column(modifier = modifier.semantics(mergeDescendants = true) {}) {
+        Text(
+            text = entry.title,
+            style = MaterialTheme.typography.titleSmall.forUserContent(),
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = localizedDate(entry.date),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            entry.quantity?.let { quantity ->
                 Text(
-                    text = stringResource(id = R.string.today_deliver),
-                    style = MaterialTheme.typography.labelLarge
+                    text = stringResource(id = R.string.qty_label, quantity),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun DeliverButton(
+    onDeliver: () -> Unit,
+    entryTitle: String,
+    modifier: Modifier = Modifier,
+) {
+    val label = stringResource(id = R.string.today_deliver)
+    Button(
+        onClick = onDeliver,
+        modifier = modifier
+            .widthIn(min = 96.dp)
+            // Three of these sit on the screen at once; without the job name
+            // they all announce identically.
+            .semantics { contentDescription = "$label، $entryTitle" },
+        contentPadding = ButtonDefaults.ContentPadding
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            maxLines = 1
+        )
     }
 }

@@ -17,6 +17,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -83,7 +85,14 @@ fun WorkEntryRow(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 14.dp, vertical = 12.dp)
+                // Title, status, quantity and date describe one thing, so a
+                // screen reader should announce them as one stop rather than
+                // making the user swipe through four fragments per row.
+                .semantics(mergeDescendants = true) {}
+        ) {
             Text(
                 text = entry.title,
                 style = MaterialTheme.typography.titleSmall.forUserContent(),
@@ -119,13 +128,20 @@ fun WorkEntryRow(
                 val action = onAdvanceStatus
                 if (action != null && showAction) {
                     nextActionLabel(entry.status)?.let { labelRes ->
+                        val label = stringResource(id = labelRes)
                         TextButton(
                             onClick = action,
-                            // Keeps the tap target at the 48dp minimum even when
-                            // the Persian label is short.
-                            modifier = Modifier.widthIn(min = 88.dp)
+                            modifier = Modifier
+                                // Keeps the tap target at the 48dp minimum even
+                                // when the Persian label is short.
+                                .widthIn(min = 88.dp)
+                                // Names the entry, so the control still says
+                                // what it acts on when read out of context.
+                                .semantics {
+                                    contentDescription = "$label، ${entry.title}"
+                                }
                         ) {
-                            Text(text = stringResource(id = labelRes))
+                            Text(text = label)
                         }
                     }
                 }
