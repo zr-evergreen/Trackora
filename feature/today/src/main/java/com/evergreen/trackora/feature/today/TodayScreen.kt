@@ -35,6 +35,7 @@ import com.evergreen.trackora.domain.model.WorkEntry
 import com.evergreen.trackora.ui.components.TrackoraEmptyState
 import com.evergreen.trackora.ui.components.TrackoraErrorState
 import com.evergreen.trackora.ui.components.TrackoraLoadingState
+import com.evergreen.trackora.ui.components.WorkEntryRow
 import com.evergreen.trackora.ui.text.localizedDate
 import com.evergreen.trackora.ui.text.localizedNumber
 import java.time.LocalDate
@@ -191,10 +192,12 @@ private fun TodayList(
             }
         } else {
             items(items = uiState.todayEntries, key = { "t-${it.id}" }) { entry ->
-                WorkEntryItem(
+                WorkEntryRow(
                     entry = entry,
                     onAdvanceStatus = { onAdvance(entry) },
                     onClick = { onEntryClick(entry.id) },
+                    // Every row here is today's, so the date would just repeat.
+                    showDate = false,
                     // Completed work is actionable in the band above, not here.
                     showAction = entry.status == Status.IN_PROGRESS
                 )

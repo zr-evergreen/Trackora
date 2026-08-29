@@ -40,4 +40,10 @@
     <string name="status_in_progress">In Progress</string>
     <string name="status_completed">Completed</string>
     <string name="status_delivered">Delivered</string>
+
+    <!-- Shared work-entry row. Lived per feature module until the row itself
+         was shared; kept here so both lists say the same thing. -->
+    <string name="work_qty_label">Qty: %1$d</string>
+    <string name="action_mark_complete">Complete</string>
+    <string name="action_mark_delivered">Delivered</string>
 </resources>
