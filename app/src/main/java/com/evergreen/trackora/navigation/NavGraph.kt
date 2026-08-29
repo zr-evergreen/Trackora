@@ -26,6 +26,7 @@ import androidx.navigation.toRoute
 import com.evergreen.trackora.feature.addedit.AddEditWorkScreen
 import com.evergreen.trackora.feature.allwork.allWorkNavigation
 import com.evergreen.trackora.feature.reports.reportsNavigation
+import com.evergreen.trackora.domain.model.Status
 import com.evergreen.trackora.feature.today.todayNavigation
 import com.evergreen.trackora.ui.settings.SettingsScreen
 import com.evergreen.trackora.R
@@ -80,7 +81,7 @@ fun NavGraph(
                 // The band shows only the oldest few; the rest live in the
                 // history, where the Completed filter and search already exist.
                 onSeeAllUndelivered = {
-                    navController.navigate(AllWorkRoute) {
+                    navController.navigate(AllWorkRoute(initialStatus = Status.COMPLETED.name)) {
                         launchSingleTop = true
                         restoreState = true
                     }
@@ -183,7 +184,7 @@ private fun BottomNavigationBar(
                 it.route?.contains("AllWorkRoute") == true 
             } == true,
             onClick = {
-                navController.navigate(AllWorkRoute) {
+                navController.navigate(AllWorkRoute()) {
                     popUpTo(navController.graph.findStartDestination().id) {
                         saveState = true
                     }

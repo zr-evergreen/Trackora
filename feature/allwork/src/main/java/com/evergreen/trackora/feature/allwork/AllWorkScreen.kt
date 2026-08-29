@@ -68,7 +68,8 @@ import com.evergreen.trackora.ui.text.forUserContent
 fun AllWorkScreen(
     contentPadding: androidx.compose.foundation.layout.PaddingValues,
     onEntryClick: (Long) -> Unit,
-    viewModel: AllWorkViewModel
+    viewModel: AllWorkViewModel,
+    initialStatus: Status? = null,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -78,6 +79,12 @@ fun AllWorkScreen(
     // Parking focus on the container instead leaves the field unfocused until
     // it is actually tapped. clearFocus() does not work for this — it runs
     // before the field claims focus, not after.
+    // Applied once per arrival, not on every recomposition, so the user can
+    // still clear the filter on a screen they were sent to with one set.
+    LaunchedEffect(initialStatus) {
+        if (initialStatus != null) viewModel.setFilter(initialStatus)
+    }
+
     val initialFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { initialFocus.requestFocus() }
 
