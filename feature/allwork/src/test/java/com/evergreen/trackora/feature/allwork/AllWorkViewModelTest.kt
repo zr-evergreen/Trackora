@@ -6,6 +6,7 @@ import com.evergreen.trackora.domain.model.WorkEntry
 import com.evergreen.trackora.domain.usecase.DeleteWorkEntryUseCase
 import com.evergreen.trackora.domain.usecase.GetAllWorkEntriesUseCase
 import com.evergreen.trackora.domain.usecase.InsertWorkEntryUseCase
+import com.evergreen.trackora.domain.usecase.UpdateWorkEntryUseCase
 import com.evergreen.trackora.util.AppConstants
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -52,10 +53,13 @@ class AllWorkViewModelTest {
         entry(4, Status.DELIVERED)
     )
 
+    private val updateWorkEntryUseCase: UpdateWorkEntryUseCase = mockk(relaxed = true)
+
     private fun viewModel() = AllWorkViewModel(
         getAllWorkEntriesUseCase,
         deleteWorkEntryUseCase,
-        insertWorkEntryUseCase
+        insertWorkEntryUseCase,
+        updateWorkEntryUseCase
     )
 
     // --- Loading ------------------------------------------------------------

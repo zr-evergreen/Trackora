@@ -12,7 +12,9 @@ data class AllWorkUiState(
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     /** Held only while the undo snackbar is on screen. */
-    val recentlyDeleted: WorkEntry? = null
+    val recentlyDeleted: WorkEntry? = null,
+    /** The pre-change entry, held only while the undo snackbar is on screen. */
+    val recentlyAdvanced: WorkEntry? = null
 ) {
     val filteredEntries: List<WorkEntry>
         get() = filter?.let { status -> entries.filter { it.status == status } } ?: entries

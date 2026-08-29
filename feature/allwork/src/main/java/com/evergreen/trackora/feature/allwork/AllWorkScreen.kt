@@ -1,7 +1,6 @@
 package com.evergreen.trackora.feature.allwork
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -24,8 +22,6 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.rememberSwipeToDismissBoxState
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,17 +32,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.evergreen.trackora.domain.model.Status
 import com.evergreen.trackora.domain.model.WorkEntry
-import com.evergreen.trackora.ui.components.StatusPill
 import com.evergreen.trackora.ui.components.TrackoraEmptyState
 import com.evergreen.trackora.ui.components.TrackoraErrorState
+import com.evergreen.trackora.ui.components.TrackoraFilterChip
+import com.evergreen.trackora.ui.components.TrackoraFilterRow
 import com.evergreen.trackora.ui.components.TrackoraLoadingState
 import com.evergreen.trackora.ui.components.TrackoraScreenContainer
+import com.evergreen.trackora.ui.components.WorkEntryRow
 import com.evergreen.trackora.ui.text.forUserContent
 
 /**
@@ -76,6 +75,23 @@ fun AllWorkScreen(
             )
             if (result == SnackbarResult.ActionPerformed) viewModel.undoDelete()
             else viewModel.clearRecentlyDeleted()
+        }
+    }
+
+    val advancedTitle = uiState.recentlyAdvanced?.title
+    val advancedMessage = advancedTitle?.let {
+        stringResource(id = R.string.entry_status_changed, it)
+    }
+
+    LaunchedEffect(uiState.recentlyAdvanced) {
+        if (advancedMessage != null) {
+            val result = snackbarHostState.showSnackbar(
+                message = advancedMessage,
+                actionLabel = undoLabel,
+                duration = SnackbarDuration.Short
+            )
+            if (result == SnackbarResult.ActionPerformed) viewModel.undoAdvance()
+            else viewModel.clearRecentlyAdvanced()
         }
     }
 
@@ -124,6 +140,7 @@ fun AllWorkScreen(
                         SwipeableEntry(
                             entry = entry,
                             onClick = { onEntryClick(entry.id) },
+                            onAdvanceStatus = { viewModel.advanceStatus(entry) },
                             onDelete = { viewModel.deleteEntry(entry) }
                         )
                     }
@@ -157,6 +174,7 @@ fun AllWorkScreen(
 private fun SwipeableEntry(
     entry: WorkEntry,
     onClick: () -> Unit,
+    onAdvanceStatus: () -> Unit,
     onDelete: () -> Unit
 ) {
     val dismissState = rememberSwipeToDismissBoxState(
@@ -176,7 +194,11 @@ private fun SwipeableEntry(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 6.dp)
+                    // Must match WorkEntryRow's own card padding exactly, or
+                    // the background shows as a permanent coloured sliver down
+                    // both edges of every row instead of appearing on swipe.
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                    .clip(MaterialTheme.shapes.medium)
                     .background(MaterialTheme.colorScheme.errorContainer)
                     .padding(horizontal = 24.dp),
                 contentAlignment = Alignment.Center
@@ -189,7 +211,13 @@ private fun SwipeableEntry(
             }
         }
     ) {
-        AllWorkListItem(entry = entry, onClick = onClick)
+        WorkEntryRow(
+            entry = entry,
+            onClick = onClick,
+            onAdvanceStatus = onAdvanceStatus,
+            // History spans months, so each row states its own date.
+            showDate = true
+        )
     }
 }
 
@@ -205,91 +233,13 @@ private fun StatusFilterRow(
         stringResource(id = R.string.filter_delivered) to Status.DELIVERED
     )
 
-    val scrollState = rememberScrollState()
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(scrollState),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+    TrackoraFilterRow {
         filters.forEach { (label, status) ->
-            FilterChip(
+            TrackoraFilterChip(
+                label = label,
                 selected = selected == status,
-                onClick = { onFilterSelected(status) },
-                label = {
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Visible
-                    )
-                },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ),
-                modifier = Modifier.height(40.dp)
+                onClick = { onFilterSelected(status) }
             )
         }
     }
 }
-
-@Composable
-private fun AllWorkListItem(
-    entry: WorkEntry,
-    onClick: () -> Unit
-) {
-    androidx.compose.material3.Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-        elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 2.dp),
-        onClick = onClick
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(
-                        text = entry.title,
-                        style = MaterialTheme.typography.titleMedium.forUserContent(),
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    entry.quantity?.let {
-                        Text(
-                            text = stringResource(id = R.string.qty_label, it),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-                StatusPill(
-                    label = when (entry.status) {
-                        Status.IN_PROGRESS -> stringResource(id = R.string.filter_in_progress)
-                        Status.COMPLETED -> stringResource(id = R.string.filter_completed)
-                        Status.DELIVERED -> stringResource(id = R.string.filter_delivered)
-                    },
-                    backgroundColor = when (entry.status) {
-                        Status.IN_PROGRESS -> androidx.compose.ui.graphics.Color(0xFFFF9800)
-                        Status.COMPLETED -> androidx.compose.ui.graphics.Color(0xFF4CAF50)
-                        Status.DELIVERED -> androidx.compose.ui.graphics.Color(0xFF2196F3)
-                    }
-                )
-            }
-        }
-    }
-}
-

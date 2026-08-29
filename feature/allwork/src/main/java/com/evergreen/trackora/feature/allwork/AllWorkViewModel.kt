@@ -7,6 +7,7 @@ import com.evergreen.trackora.domain.model.WorkEntry
 import com.evergreen.trackora.domain.usecase.DeleteWorkEntryUseCase
 import com.evergreen.trackora.domain.usecase.GetAllWorkEntriesUseCase
 import com.evergreen.trackora.domain.usecase.InsertWorkEntryUseCase
+import com.evergreen.trackora.domain.usecase.UpdateWorkEntryUseCase
 import com.evergreen.trackora.util.AppConstants
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,7 +25,8 @@ import javax.inject.Inject
 class AllWorkViewModel @Inject constructor(
     private val getAllWorkEntriesUseCase: GetAllWorkEntriesUseCase,
     private val deleteWorkEntryUseCase: DeleteWorkEntryUseCase,
-    private val insertWorkEntryUseCase: InsertWorkEntryUseCase
+    private val insertWorkEntryUseCase: InsertWorkEntryUseCase,
+    private val updateWorkEntryUseCase: UpdateWorkEntryUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AllWorkUiState(isLoading = true))
@@ -80,6 +82,47 @@ class AllWorkViewModel @Inject constructor(
      * are not shown anywhere and nothing references an entry by id across a
      * session.
      */
+    /**
+     * Moves [entry] one step along the lifecycle, matching Today.
+     *
+     * All Work previously offered no way to change a status at all — the user
+     * had to open the entry and use the form. Since this is the screen where
+     * older work is found, it is exactly where a forgotten job gets delivered.
+     */
+    fun advanceStatus(entry: WorkEntry) {
+        val next = when (entry.status) {
+            Status.IN_PROGRESS -> Status.COMPLETED
+            Status.COMPLETED -> Status.DELIVERED
+            Status.DELIVERED -> return
+        }
+        viewModelScope.launch {
+            try {
+                updateWorkEntryUseCase(entry.copy(status = next))
+                _uiState.update { it.copy(recentlyAdvanced = entry) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = e.message) }
+            }
+        }
+    }
+
+    /** Writes the held pre-change entry back, rather than guessing a reverse step. */
+    fun undoAdvance() {
+        val previous = _uiState.value.recentlyAdvanced ?: return
+        viewModelScope.launch {
+            try {
+                updateWorkEntryUseCase(previous)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = e.message) }
+            } finally {
+                _uiState.update { it.copy(recentlyAdvanced = null) }
+            }
+        }
+    }
+
+    fun clearRecentlyAdvanced() {
+        _uiState.update { it.copy(recentlyAdvanced = null) }
+    }
+
     fun deleteEntry(entry: WorkEntry) {
         viewModelScope.launch {
             try {
