@@ -89,6 +89,14 @@ class AllWorkViewModel @Inject constructor(
      * had to open the entry and use the form. Since this is the screen where
      * older work is found, it is exactly where a forgotten job gets delivered.
      */
+    fun setQuery(query: String) {
+        _uiState.update { it.copy(query = query) }
+    }
+
+    fun clearQuery() {
+        _uiState.update { it.copy(query = "") }
+    }
+
     fun advanceStatus(entry: WorkEntry) {
         val next = when (entry.status) {
             Status.IN_PROGRESS -> Status.COMPLETED

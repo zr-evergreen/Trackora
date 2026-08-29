@@ -10,5 +10,10 @@
     <string name="entry_deleted">«%1$s» حذف شد</string>
     <string name="undo">بازگرداندن</string>
     <string name="entry_status_changed">«%1$s» به‌روز شد</string>
+    <string name="search_hint">جستجوی کار</string>
+    <string name="search_clear">پاک کردن جستجو</string>
+    <string name="search_no_results_title">کاری پیدا نشد</string>
+    <string name="search_no_results_body">واژه دیگری را امتحان کنید یا فیلترها را بردارید.</string>
+    <string name="all_work_count">%1$d کار</string>
 </resources>
 
