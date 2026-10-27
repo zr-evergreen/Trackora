@@ -69,6 +69,7 @@ import com.evergreen.trackora.ui.text.localizedDate
 import com.evergreen.trackora.ui.theme.TrackoraIcons
 import com.evergreen.trackora.ui.theme.TrackoraMotion
 import com.evergreen.trackora.ui.theme.TrackoraSpacing
+import com.evergreen.trackora.ui.theme.cardContainer
 import com.evergreen.trackora.ui.theme.container
 import com.evergreen.trackora.ui.theme.content
 import com.evergreen.trackora.ui.theme.statusColors
@@ -437,7 +438,7 @@ private fun SearchField(
         textStyle = LocalTextStyle.current.forUserContent(),
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
         shape = MaterialTheme.shapes.extraLarge,
-        colors = trackoraTextFieldColors()
+        colors = trackoraTextFieldColors(container = MaterialTheme.colorScheme.cardContainer)
     )
 }
 

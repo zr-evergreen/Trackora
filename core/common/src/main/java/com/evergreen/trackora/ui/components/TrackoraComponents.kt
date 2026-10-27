@@ -30,7 +30,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.evergreen.trackora.ui.text.localizedNumber
 import com.evergreen.trackora.ui.theme.TrackoraSpacing
-import com.evergreen.trackora.ui.theme.cardContainer
 
 /**
  * The title block every top-level screen opens with: a bold name, and
@@ -182,19 +181,21 @@ fun cardBorder(): BorderStroke =
     BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
 
 /**
- * Colours for every text field in the app: a filled card-coloured field with
- * a soft outline that turns indigo on focus, so forms sit on the page the way
- * the list cards do.
+ * Colours for every text field in the app: a soft outline that turns indigo
+ * on focus.
+ *
+ * Transparent by default. A field with a floating label cuts a notch in its
+ * outline for the label, and Material cuts the fill with it, so a filled
+ * labelled field showed a page-coloured box behind its label. Fields without
+ * a label — search — can pass [container] to sit on the page as a card does.
  */
 @Composable
-fun trackoraTextFieldColors(): TextFieldColors {
-    val fill = MaterialTheme.colorScheme.cardContainer
-    return OutlinedTextFieldDefaults.colors(
+fun trackoraTextFieldColors(container: Color = Color.Transparent): TextFieldColors =
+    OutlinedTextFieldDefaults.colors(
         focusedBorderColor = MaterialTheme.colorScheme.primary,
         unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-        focusedContainerColor = fill,
-        unfocusedContainerColor = fill,
-        errorContainerColor = fill,
-        disabledContainerColor = fill,
+        focusedContainerColor = container,
+        unfocusedContainerColor = container,
+        errorContainerColor = container,
+        disabledContainerColor = container,
     )
-}
