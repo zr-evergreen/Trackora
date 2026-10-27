@@ -44,8 +44,10 @@
     <!-- Shared work-entry row. Lived per feature module until the row itself
          was shared; kept here so both lists say the same thing. -->
     <string name="work_qty_label">Qty: %1$d</string>
-    <string name="action_mark_complete">Completed</string>
-    <string name="action_mark_delivered">Delivered</string>
+    <!-- A row's forward action. Verbs, not status names: labelled with the
+         next status, the button read as a second status beside the first. -->
+    <string name="action_mark_complete">Mark done</string>
+    <string name="action_mark_delivered">Mark delivered</string>
     <!-- Read by screen readers on a row's action button: what it does, then
          which entry it does it to, joined the way this language joins them. -->
     <string name="action_for_entry">%1$s, %2$s</string>

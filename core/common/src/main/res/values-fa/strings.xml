@@ -33,8 +33,9 @@
 
     <!-- Shared work-entry row -->
     <string name="work_qty_label">تعداد: %1$d</string>
-    <string name="action_mark_complete">تکمیل شد</string>
-    <string name="action_mark_delivered">تحویل شد</string>
+    <!-- Forward action: a verb phrase, distinct from the status names. -->
+    <string name="action_mark_complete">ثبت تکمیل</string>
+    <string name="action_mark_delivered">ثبت تحویل</string>
     <!-- Read by screen readers on a row's action button. -->
     <string name="action_for_entry">%1$s، %2$s</string>
 </resources>

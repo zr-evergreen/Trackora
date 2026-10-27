@@ -26,6 +26,7 @@ import com.evergreen.trackora.ui.components.StatusActionButton
 import com.evergreen.trackora.ui.components.cardBorder
 import com.evergreen.trackora.ui.isLargeTextScale
 import com.evergreen.trackora.ui.text.forUserContent
+import com.evergreen.trackora.ui.text.layoutStartAlign
 import com.evergreen.trackora.ui.text.localizedRelativeDate
 import com.evergreen.trackora.ui.theme.TrackoraIcons
 import com.evergreen.trackora.ui.theme.cardContainer
@@ -36,7 +37,7 @@ import java.time.LocalDate
  * band's grouped card.
  *
  * Distinct from the ordinary entry row on purpose. This row exists to be acted
- * on, so it carries exactly one action — Delivered — as a real button rather
+ * on, so it carries exactly one action — Mark delivered — as a real button rather
  * than as one of three near-identical status chips.
  *
  * The date is relative — "5 days ago" — because these entries are
@@ -109,6 +110,8 @@ private fun UndeliveredDetails(entry: WorkEntry, modifier: Modifier = Modifier) 
             style = MaterialTheme.typography.titleMedium.forUserContent(),
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface,
+            // Against the layout's start edge, like the entry cards below.
+            textAlign = layoutStartAlign(),
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.fillMaxWidth()

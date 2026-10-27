@@ -86,6 +86,25 @@ fun TrackoraStatusColors.content(status: Status): Color = when (status) {
     Status.DELIVERED -> onDeliveredContainer
 }
 
+/**
+ * The colour that marks [status] on its own, with no container behind it:
+ * the edge mark of an entry card, its status label, and the icon of the
+ * button that moves an entry into it.
+ *
+ * These are the scheme's three accents, one per stage — indigo while the
+ * work is under way, saffron once it is finished and waiting, turquoise once
+ * it has reached the customer — so a card's status reads in the same colour
+ * as the Today band and the filter chips that already use them. Each clears
+ * 6:1 against the card in both themes, so they are safe for text.
+ */
+@Composable
+@ReadOnlyComposable
+fun statusAccent(status: Status): Color = when (status) {
+    Status.IN_PROGRESS -> MaterialTheme.colorScheme.primary
+    Status.COMPLETED -> MaterialTheme.colorScheme.tertiary
+    Status.DELIVERED -> MaterialTheme.colorScheme.secondary
+}
+
 internal val LocalStatusColors = staticCompositionLocalOf { LightStatusColors }
 
 /** Status colours for the current theme. */
