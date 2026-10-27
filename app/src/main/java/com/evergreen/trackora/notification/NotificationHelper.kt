@@ -19,8 +19,11 @@ class NotificationHelper(private val context: Context) {
         context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     
     companion object {
+        // The id predates the reminder's switch to undelivered work. It stays:
+        // a new id would orphan the existing channel on installed devices and
+        // reset whatever the user had set for it. Only the name changes, and
+        // re-creating a channel with the same id updates its name in place.
         private const val CHANNEL_ID = "in_progress_work_channel"
-        private const val CHANNEL_NAME = "In Progress Work Reminders"
         private const val NOTIFICATION_ID = 1
         
         /**
@@ -30,7 +33,7 @@ class NotificationHelper(private val context: Context) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val channel = NotificationChannel(
                     CHANNEL_ID,
-                    CHANNEL_NAME,
+                    context.getString(R.string.notification_channel_name),
                     NotificationManager.IMPORTANCE_DEFAULT
                 ).apply {
                     description = context.getString(R.string.notification_channel_description)

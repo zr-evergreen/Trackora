@@ -29,6 +29,7 @@ object AppConstants {
         const val FAILED_TO_ADD = "Failed to add entry"
         const val FAILED_TO_UPDATE = "Failed to update entry"
         const val FAILED_TO_UPDATE_STATUS = "Failed to update status"
+        const val FAILED_TO_ATTACH_PHOTO = "Could not attach the photo"
         const val TITLE_CANNOT_BE_EMPTY = "Title cannot be empty"
     }
 }

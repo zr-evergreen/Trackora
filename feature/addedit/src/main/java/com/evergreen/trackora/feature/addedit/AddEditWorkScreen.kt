@@ -23,6 +23,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarToday
@@ -78,9 +80,7 @@ import com.evergreen.trackora.util.AppConstants
 import com.evergreen.trackora.util.JalaliCalendar
 import java.io.File
 import java.text.SimpleDateFormat
-import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneId
 import java.util.Date
 import java.util.Locale
 
@@ -143,9 +143,9 @@ fun AddEditWorkScreen(
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        uri?.let {
-            viewModel.onPhotoSelected(it.toString())
-        }
+        // Copied into app storage rather than stored as-is: the picker's URI
+        // is only readable until the app restarts.
+        uri?.let { viewModel.onGalleryPhotoPicked(it) }
     }
 
     // Public function to launch camera (with permission check)
@@ -199,6 +199,13 @@ fun AddEditWorkScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                // The window is edge to edge, so adjustResize does not shrink
+                // it for the keyboard; without this the lower fields (the
+                // custom fields, quantity on small phones) sit under the
+                // keyboard while being typed into. Shrinking the scroll
+                // viewport lets it keep the focused field in view.
+                .consumeWindowInsets(paddingValues)
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -416,7 +423,8 @@ fun AddEditWorkScreen(
             // Save Button
             Button(
                 onClick = viewModel::save,
-                enabled = uiState.isValid && !uiState.isSaving && uiState.hasChanges,
+                enabled = uiState.isValid && !uiState.isSaving && uiState.hasChanges &&
+                    !uiState.isImportingPhoto,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 8.dp)
@@ -455,11 +463,10 @@ fun AddEditWorkScreen(
                 )
             } else {
                 // Use standard Gregorian date picker
+                // UTC both ways; see DatePickerDates for why the device zone
+                // moved the date back a day in Iran.
                 val datePickerState = rememberDatePickerState(
-                    initialSelectedDateMillis = uiState.date
-                        .atStartOfDay(ZoneId.systemDefault())
-                        .toInstant()
-                        .toEpochMilli()
+                    initialSelectedDateMillis = DatePickerDates.toPickerMillis(uiState.date)
                 )
 
                 DatePickerDialog(
@@ -468,10 +475,7 @@ fun AddEditWorkScreen(
                         TextButton(
                             onClick = {
                                 datePickerState.selectedDateMillis?.let { millis ->
-                                    val selectedDate = Instant.ofEpochMilli(millis)
-                                        .atZone(ZoneId.systemDefault())
-                                        .toLocalDate()
-                                    viewModel.onDateChange(selectedDate)
+                                    viewModel.onDateChange(DatePickerDates.fromPickerMillis(millis))
                                 }
                             }
                         ) {

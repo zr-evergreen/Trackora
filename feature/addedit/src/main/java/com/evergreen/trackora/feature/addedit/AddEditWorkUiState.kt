@@ -27,6 +27,8 @@ data class AddEditWorkUiState(
     val titleError: String? = null,
     val quantityError: String? = null,
     val photoUri: String? = null,
+    /** A picked gallery photo is still being copied into app storage. */
+    val isImportingPhoto: Boolean = false,
 ) {
     /**
      * Checks if the form is valid for submission.

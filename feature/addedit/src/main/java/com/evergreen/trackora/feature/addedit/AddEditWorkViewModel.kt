@@ -1,5 +1,6 @@
 package com.evergreen.trackora.feature.addedit
 
+import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -14,6 +15,8 @@ import com.evergreen.trackora.util.AppConstants
 import com.evergreen.trackora.util.PersianDigits
 import com.evergreen.trackora.util.WorkEntryValidator
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,6 +34,7 @@ class AddEditWorkViewModel @Inject constructor(
     private val insertWorkEntryUseCase: InsertWorkEntryUseCase,
     private val updateWorkEntryUseCase: UpdateWorkEntryUseCase,
     private val getWorkEntryByIdUseCase: GetWorkEntryByIdUseCase,
+    private val galleryPhotoImporter: GalleryPhotoImporter,
     customFieldsManager: CustomFieldsManager,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -39,6 +43,8 @@ class AddEditWorkViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(AddEditWorkUiState())
     val uiState: StateFlow<AddEditWorkUiState> = _uiState.asStateFlow()
+
+    private var photoImportJob: Job? = null
 
     // Custom field names from settings
     val customFieldNames = customFieldsManager.allCustomFields.map { fields: CustomFields ->
@@ -147,6 +153,37 @@ class AddEditWorkViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Attaches a photo picked from the gallery by copying it into app storage
+     * first. The picker's own URI stops being readable once the app restarts;
+     * see [GalleryPhotoImporter].
+     */
+    fun onGalleryPhotoPicked(source: Uri) {
+        // A newer pick replaces a copy still in progress, so the older one
+        // finishing late can neither attach its photo nor end the busy state.
+        photoImportJob?.cancel()
+        _uiState.update { it.copy(isImportingPhoto = true) }
+        photoImportJob = viewModelScope.launch {
+            val copied = try {
+                galleryPhotoImporter.import(source)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Same outcome as a failed copy: nothing to attach. Escaping
+                // the coroutine would crash the app instead.
+                null
+            }
+            if (copied != null) {
+                onPhotoSelected(copied)
+            } else {
+                _uiState.update {
+                    it.copy(errorMessage = AppConstants.Errors.FAILED_TO_ATTACH_PHOTO)
+                }
+            }
+            _uiState.update { it.copy(isImportingPhoto = false) }
+        }
+    }
+
     fun clearPhoto() {
         _uiState.update {
             it.copy(
@@ -201,6 +238,11 @@ class AddEditWorkViewModel @Inject constructor(
 
     fun save() {
         val currentState = _uiState.value
+
+        // Saving before a picked photo has been copied would store the entry
+        // without it, silently. The Save button is disabled meanwhile; this
+        // is the backstop.
+        if (currentState.isImportingPhoto) return
 
         // Validate all fields using centralized validator
         val (titleValidation, quantityValidation) = WorkEntryValidator.validateForSave(

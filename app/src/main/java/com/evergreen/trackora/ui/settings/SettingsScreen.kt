@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -129,8 +130,15 @@ private fun SettingsScreenContent(
     var customField2 by rememberSaveable { mutableStateOf(uiState.customFields.field2Name) }
     var customField3 by rememberSaveable { mutableStateOf(uiState.customFields.field3Name) }
 
-    // Update local state when UI state changes
+    // Set once the user types. From then on the fields are the source of
+    // truth: each keystroke is saved to DataStore and its echo comes back a
+    // moment later, and copying those late echoes into the fields overwrote
+    // characters typed in between — fast input saved "Customer" as "Custmero".
+    var editedCustomFields by rememberSaveable { mutableStateOf(false) }
+
+    // Picks up the stored names when they load, until the user starts editing.
     LaunchedEffect(uiState.customFields) {
+        if (editedCustomFields) return@LaunchedEffect
         customField1 = uiState.customFields.field1Name
         customField2 = uiState.customFields.field2Name
         customField3 = uiState.customFields.field3Name
@@ -139,6 +147,12 @@ private fun SettingsScreenContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            // Edge to edge, adjustResize does not shrink the window for the
+            // keyboard, so the custom-field inputs were typed into while
+            // hidden under it. The full keyboard height is needed here:
+            // contentPadding is applied inside the scroll, not to the
+            // viewport, so none of it keeps the viewport clear of the keyboard.
+            .imePadding()
             .verticalScroll(scrollState)
             .padding(contentPadding)
             .padding(horizontal = 16.dp, vertical = 12.dp),
@@ -211,6 +225,7 @@ private fun SettingsScreenContent(
             OutlinedTextField(
                 value = customField1,
                 onValueChange = {
+                    editedCustomFields = true
                     customField1 = it
                     onCustomFieldsChanged(
                         CustomFields(
@@ -240,6 +255,7 @@ private fun SettingsScreenContent(
             OutlinedTextField(
                 value = customField2,
                 onValueChange = {
+                    editedCustomFields = true
                     customField2 = it
                     onCustomFieldsChanged(
                         CustomFields(
@@ -269,6 +285,7 @@ private fun SettingsScreenContent(
             OutlinedTextField(
                 value = customField3,
                 onValueChange = {
+                    editedCustomFields = true
                     customField3 = it
                     onCustomFieldsChanged(
                         CustomFields(

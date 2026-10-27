@@ -15,7 +15,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
@@ -70,6 +69,13 @@ import java.time.LocalDate
  */
 @Composable
 fun TodayScreen(
+    /**
+     * Shown by the app's Scaffold, not by this screen. Today is the one screen
+     * with the add button, and a snackbar hosted here was drawn under it: the
+     * button covered Undo completely, on the right in English and on the left
+     * in Persian. The Scaffold places its snackbar above the button.
+     */
+    snackbarHostState: SnackbarHostState,
     viewModel: TodayViewModel = hiltViewModel(),
     contentPadding: PaddingValues = PaddingValues(),
     onEntryClick: (Long) -> Unit = {},
@@ -77,7 +83,6 @@ fun TodayScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val today = LocalDate.now()
-    val snackbarHostState = remember { SnackbarHostState() }
 
     val advancedTitle = uiState.recentlyAdvanced?.title
     val advancedMessage = advancedTitle?.let {
@@ -141,13 +146,6 @@ fun TodayScreen(
                 )
             }
         }
-
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(contentPadding)
-        )
     }
 }
 

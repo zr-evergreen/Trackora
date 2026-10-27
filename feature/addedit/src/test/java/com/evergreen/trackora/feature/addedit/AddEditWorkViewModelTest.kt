@@ -1,5 +1,6 @@
 package com.evergreen.trackora.feature.addedit
 
+import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.evergreen.trackora.domain.model.Status
@@ -15,6 +16,7 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -47,6 +49,7 @@ class AddEditWorkViewModelTest {
     private val updateWorkEntryUseCase = mockk<UpdateWorkEntryUseCase>(relaxed = true)
     private val getWorkEntryByIdUseCase = mockk<GetWorkEntryByIdUseCase>()
     private val customFieldsManager = mockk<CustomFieldsManager>()
+    private val galleryPhotoImporter = mockk<GalleryPhotoImporter>()
 
     private val existingEntry = WorkEntry(
         id = 12L,
@@ -72,6 +75,7 @@ class AddEditWorkViewModelTest {
             insertWorkEntryUseCase = insertWorkEntryUseCase,
             updateWorkEntryUseCase = updateWorkEntryUseCase,
             getWorkEntryByIdUseCase = getWorkEntryByIdUseCase,
+            galleryPhotoImporter = galleryPhotoImporter,
             customFieldsManager = customFieldsManager,
             savedStateHandle = savedStateHandle
         )
@@ -388,6 +392,99 @@ class AddEditWorkViewModelTest {
 
         coVerify { insertWorkEntryUseCase(capture(entry)) }
         assertNull(entry.captured.photoUri)
+    }
+
+    @Test
+    fun `a gallery photo is saved as the app's own copy, not the picker's URI`() = runTest {
+        // The picker's URI is readable only until the app restarts; storing it
+        // left an empty photo card on every later visit.
+        val picked = mockk<Uri>()
+        coEvery { galleryPhotoImporter.import(picked) } returns
+            "content://com.evergreen.trackora.fileprovider/external_files/IMG_1_gallery.jpg"
+        val vm = viewModel()
+        vm.onTitleChange("With gallery photo")
+
+        vm.onGalleryPhotoPicked(picked)
+        val entry = slot<WorkEntry>()
+        vm.save()
+
+        coVerify { insertWorkEntryUseCase(capture(entry)) }
+        assertEquals(
+            "content://com.evergreen.trackora.fileprovider/external_files/IMG_1_gallery.jpg",
+            entry.captured.photoUri
+        )
+    }
+
+    @Test
+    fun `a gallery photo that cannot be copied is reported and leaves the photo unchanged`() = runTest {
+        val picked = mockk<Uri>()
+        coEvery { galleryPhotoImporter.import(picked) } returns null
+        val vm = viewModel()
+        vm.onPhotoSelected("content://photo/1")
+
+        vm.onGalleryPhotoPicked(picked)
+
+        assertEquals("content://photo/1", vm.uiState.value.photoUri)
+        assertEquals(AppConstants.Errors.FAILED_TO_ATTACH_PHOTO, vm.uiState.value.errorMessage)
+    }
+
+    @Test
+    fun `saving waits until a picked gallery photo has been copied`() = runTest {
+        // Saving mid-copy used to store the entry without the photo, silently.
+        val picked = mockk<Uri>()
+        val copy = CompletableDeferred<String?>()
+        coEvery { galleryPhotoImporter.import(picked) } coAnswers { copy.await() }
+        val vm = viewModel()
+        vm.onTitleChange("With gallery photo")
+
+        vm.onGalleryPhotoPicked(picked)
+        vm.save()
+
+        assertTrue(vm.uiState.value.isImportingPhoto)
+        coVerify(exactly = 0) { insertWorkEntryUseCase(any()) }
+
+        copy.complete("content://com.evergreen.trackora.fileprovider/external_files/IMG_2_gallery.jpg")
+        assertFalse(vm.uiState.value.isImportingPhoto)
+
+        val entry = slot<WorkEntry>()
+        vm.save()
+
+        coVerify { insertWorkEntryUseCase(capture(entry)) }
+        assertEquals(
+            "content://com.evergreen.trackora.fileprovider/external_files/IMG_2_gallery.jpg",
+            entry.captured.photoUri
+        )
+    }
+
+    @Test
+    fun `a gallery import that throws is reported instead of crashing`() = runTest {
+        val picked = mockk<Uri>()
+        coEvery { galleryPhotoImporter.import(picked) } throws IllegalArgumentException("unshareable path")
+        val vm = viewModel()
+        vm.onPhotoSelected("content://photo/1")
+
+        vm.onGalleryPhotoPicked(picked)
+
+        assertEquals("content://photo/1", vm.uiState.value.photoUri)
+        assertEquals(AppConstants.Errors.FAILED_TO_ATTACH_PHOTO, vm.uiState.value.errorMessage)
+        assertFalse(vm.uiState.value.isImportingPhoto)
+    }
+
+    @Test
+    fun `a copy finishing after a newer pick does not replace the newer photo`() = runTest {
+        val first = mockk<Uri>()
+        val second = mockk<Uri>()
+        val firstCopy = CompletableDeferred<String?>()
+        coEvery { galleryPhotoImporter.import(first) } coAnswers { firstCopy.await() }
+        coEvery { galleryPhotoImporter.import(second) } returns "content://photo/second"
+        val vm = viewModel()
+
+        vm.onGalleryPhotoPicked(first)
+        vm.onGalleryPhotoPicked(second)
+        firstCopy.complete("content://photo/first")
+
+        assertEquals("content://photo/second", vm.uiState.value.photoUri)
+        assertFalse(vm.uiState.value.isImportingPhoto)
     }
 
     @Test
