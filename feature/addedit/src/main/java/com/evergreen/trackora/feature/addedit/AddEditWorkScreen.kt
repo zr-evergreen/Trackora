@@ -423,7 +423,8 @@ fun AddEditWorkScreen(
             // Save Button
             Button(
                 onClick = viewModel::save,
-                enabled = uiState.isValid && !uiState.isSaving && uiState.hasChanges,
+                enabled = uiState.isValid && !uiState.isSaving && uiState.hasChanges &&
+                    !uiState.isImportingPhoto,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 8.dp)
