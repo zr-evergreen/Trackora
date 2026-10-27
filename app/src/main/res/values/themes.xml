@@ -9,10 +9,10 @@
         a parent that the qualified variant can inherit from.
     -->
     <style name="Base.Theme.Trackora" parent="Theme.AppCompat.DayNight.NoActionBar">
-        <!-- Primary brand color - Modern professional blue -->
-        <item name="colorPrimary">@color/trackora_blue_primary</item>
-        <item name="colorPrimaryDark">@color/trackora_blue_dark</item>
-        <item name="colorAccent">@color/teal_500</item>
+        <!-- Ink indigo, matching the Compose theme's primary. -->
+        <item name="colorPrimary">@color/trackora_primary</item>
+        <item name="colorPrimaryDark">@color/trackora_primary_container</item>
+        <item name="colorAccent">@color/trackora_accent</item>
 
         <!-- Status bar - matches Material 3 background -->
         <item name="android:statusBarColor">@color/trackora_background</item>
