@@ -13,6 +13,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -69,9 +70,13 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -79,8 +84,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.core.net.toUri
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import coil.compose.AsyncImagePainter
 import com.evergreen.trackora.domain.model.Status
 import com.evergreen.trackora.ui.components.IconTile
 import com.evergreen.trackora.ui.components.JalaliDatePickerDialog
@@ -141,7 +148,7 @@ fun AddEditWorkScreen(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
         if (success && cameraImageUri != null) {
-            viewModel.onPhotoSelected(cameraImageUri.toString())
+            viewModel.onCameraPhotoTaken(cameraImageUri.toString())
         }
     }
 
@@ -246,7 +253,8 @@ fun AddEditWorkScreen(
             SaveBar(
                 enabled = canSave,
                 isSaving = uiState.isSaving,
-                onSave = viewModel::save
+                onSave = viewModel::save,
+                errorMessage = uiState.errorMessage
             )
         }
     ) { paddingValues ->
@@ -422,17 +430,9 @@ fun AddEditWorkScreen(
                     },
                     onRemovePhoto = {
                         viewModel.clearPhoto()
-                    }
+                    },
+                    onCancelImport = viewModel::cancelPhotoImport
                 )
-            }
-
-            // Error Message
-            AnimatedVisibility(
-                visible = uiState.errorMessage != null,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically()
-            ) {
-                ErrorNote(message = uiState.errorMessage.orEmpty())
             }
 
             Spacer(modifier = Modifier.height(TrackoraSpacing.lg))
@@ -491,21 +491,44 @@ fun AddEditWorkScreen(
  *
  * It pads itself for the navigation bar and the keyboard, whichever is
  * taller, so it sits on top of the keyboard while a field is being typed in.
+ *
+ * A failed save or photo is reported here, directly above the button. Save
+ * can be tapped from anywhere in the form, and an error drawn at the end of
+ * the scrolling content was off screen whenever the user was not already
+ * there, so the tap looked as if it had done nothing.
  */
 @Composable
-private fun SaveBar(
+internal fun SaveBar(
     enabled: Boolean,
     isSaving: Boolean,
     onSave: () -> Unit,
+    errorMessage: String?,
 ) {
+    // The last message, kept while the note animates closed so it does not
+    // blank out on its way out.
+    var lastError by remember { mutableStateOf("") }
+    LaunchedEffect(errorMessage) {
+        if (errorMessage != null) lastError = errorMessage
+    }
+
     Surface(color = MaterialTheme.colorScheme.surfaceContainer) {
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
                 .imePadding()
                 .padding(horizontal = TrackoraSpacing.screen, vertical = TrackoraSpacing.md)
         ) {
+            AnimatedVisibility(
+                visible = errorMessage != null,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                ErrorNote(
+                    message = errorMessage ?: lastError,
+                    modifier = Modifier.padding(bottom = TrackoraSpacing.md)
+                )
+            }
             Button(
                 onClick = onSave,
                 enabled = enabled,
@@ -646,115 +669,161 @@ private fun DateRow(
 }
 
 /**
- * The photo, or the two ways to add one.
+ * The photo, or the ways to add one.
  *
- * While a gallery photo is being copied into the app the area shows progress
- * in its place — Save is held back until the copy lands, and without this the
- * form gave no sign of why.
+ * While a gallery photo is being copied into the app, its progress shows
+ * above the camera and gallery choices rather than in their place. Save is
+ * held back until the copy lands, and a copy from a slow or offline provider
+ * may not land for a long time, so the user can abandon it, or pick again and
+ * let the new photo replace it.
  */
 @Composable
-private fun PhotoSelector(
+internal fun PhotoSelector(
     photoUri: String?,
     isImporting: Boolean,
     onTakePhoto: () -> Unit,
     onChooseFromGallery: () -> Unit,
-    onRemovePhoto: () -> Unit
+    onRemovePhoto: () -> Unit,
+    onCancelImport: () -> Unit,
 ) {
-    val state = when {
-        isImporting -> PhotoState.Importing
-        photoUri != null -> PhotoState.Present
-        else -> PhotoState.Empty
-    }
     AnimatedContent(
-        targetState = state,
+        // The photo itself is the state, so the frame fading out after a
+        // removal still has the photo it was showing.
+        targetState = photoUri.takeUnless { isImporting },
         transitionSpec = {
             fadeIn(tween(TrackoraMotion.MEDIUM)) togetherWith fadeOut(tween(TrackoraMotion.SHORT))
         },
         label = "photo"
-    ) { current ->
-        when (current) {
-            PhotoState.Importing -> Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(16f / 9f),
-                shape = MaterialTheme.shapes.large,
-                color = MaterialTheme.colorScheme.surfaceContainer
-            ) {
-                Column(
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
+    ) { shown ->
+        if (shown != null) {
+            PhotoFrame(photoUri = shown, onRemovePhoto = onRemovePhoto)
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(TrackoraSpacing.md)) {
+                AnimatedVisibility(
+                    visible = isImporting,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
                 ) {
-                    CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 3.dp)
-                    Spacer(modifier = Modifier.height(TrackoraSpacing.md))
-                    Text(
-                        text = stringResource(id = R.string.photo_importing),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    ImportProgress(onCancel = onCancelImport)
                 }
-            }
-
-            PhotoState.Present -> Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(MaterialTheme.shapes.large)
-            ) {
-                AsyncImage(
-                    model = photoUri?.let(Uri::parse),
-                    contentDescription = null,
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .aspectRatio(16f / 9f),
-                    contentScale = ContentScale.Crop
-                )
-                // On a light-backed button so it stays visible over any photo;
-                // a bare icon disappeared against pale pictures.
-                FilledIconButton(
-                    onClick = onRemovePhoto,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(TrackoraSpacing.sm),
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-                        contentColor = MaterialTheme.colorScheme.onSurface
-                    )
+                        .height(IntrinsicSize.Min),
+                    horizontalArrangement = Arrangement.spacedBy(TrackoraSpacing.md)
                 ) {
-                    Icon(
-                        imageVector = TrackoraIcons.Clear,
-                        contentDescription = stringResource(id = R.string.action_remove_photo)
+                    PhotoSourceTile(
+                        icon = TrackoraIcons.Camera,
+                        label = stringResource(id = R.string.action_take_photo),
+                        onClick = onTakePhoto,
+                        modifier = Modifier.weight(1f)
+                    )
+                    PhotoSourceTile(
+                        icon = TrackoraIcons.Gallery,
+                        label = stringResource(id = R.string.action_choose_from_gallery),
+                        onClick = onChooseFromGallery,
+                        modifier = Modifier.weight(1f)
                     )
                 }
-            }
-
-            PhotoState.Empty -> Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(IntrinsicSize.Min),
-                horizontalArrangement = Arrangement.spacedBy(TrackoraSpacing.md)
-            ) {
-                PhotoSourceTile(
-                    icon = TrackoraIcons.Camera,
-                    label = stringResource(id = R.string.action_take_photo),
-                    onClick = onTakePhoto,
-                    modifier = Modifier.weight(1f)
-                )
-                PhotoSourceTile(
-                    icon = TrackoraIcons.Gallery,
-                    label = stringResource(id = R.string.action_choose_from_gallery),
-                    onClick = onChooseFromGallery,
-                    modifier = Modifier.weight(1f)
-                )
             }
         }
     }
 }
 
-private enum class PhotoState { Empty, Importing, Present }
+/** A gallery copy in progress, with the way out of it. */
+@Composable
+private fun ImportProgress(onCancel: () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainer
+    ) {
+        Row(
+            modifier = Modifier.padding(start = TrackoraSpacing.lg, end = TrackoraSpacing.xs),
+            horizontalArrangement = Arrangement.spacedBy(TrackoraSpacing.md),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.5.dp)
+            Text(
+                text = stringResource(id = R.string.photo_importing),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
+            )
+            TextButton(onClick = onCancel) {
+                Text(text = stringResource(id = R.string.action_cancel))
+            }
+        }
+    }
+}
+
+/**
+ * The attached photo, on a surface of its own.
+ *
+ * A large photo can take a second or more to decode, and the frame used to
+ * sit empty meanwhile, with the remove button floating in a gap. The surface
+ * and a spinner fill it until the photo draws, and the surface stays if the
+ * photo cannot be read at all.
+ */
+@Composable
+private fun PhotoFrame(photoUri: String, onRemovePhoto: () -> Unit) {
+    var decoding by remember(photoUri) { mutableStateOf(true) }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(16f / 9f)
+            .clip(MaterialTheme.shapes.large)
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .testTag(PhotoFrameTag)
+    ) {
+        AsyncImage(
+            model = photoUri.toUri(),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
+            onState = { state ->
+                decoding = state is AsyncImagePainter.State.Empty ||
+                    state is AsyncImagePainter.State.Loading
+            }
+        )
+        if (decoding) {
+            CircularProgressIndicator(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(28.dp),
+                strokeWidth = 3.dp
+            )
+        }
+        // On a light-backed button so it stays visible over any photo;
+        // a bare icon disappeared against pale pictures.
+        FilledIconButton(
+            onClick = onRemovePhoto,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(TrackoraSpacing.sm),
+            colors = IconButtonDefaults.filledIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                contentColor = MaterialTheme.colorScheme.onSurface
+            )
+        ) {
+            Icon(
+                imageVector = TrackoraIcons.Clear,
+                contentDescription = stringResource(id = R.string.action_remove_photo)
+            )
+        }
+    }
+}
+
+/** Test tag of the attached photo's frame. */
+internal const val PhotoFrameTag = "photo_frame"
 
 /**
  * One way to add a photo: an icon over its label. Side by side rather than
  * as two full-width buttons, and the label may wrap, so neither the longer
  * Persian label nor large text pushes them off the line.
+ *
+ * Announced as a button: a clickable surface has no role of its own, and
+ * these replaced real buttons that screen readers called buttons.
  */
 @Composable
 private fun PhotoSourceTile(
@@ -765,7 +834,9 @@ private fun PhotoSourceTile(
 ) {
     Surface(
         onClick = onClick,
-        modifier = modifier.fillMaxHeight(),
+        modifier = modifier
+            .fillMaxHeight()
+            .semantics { role = Role.Button },
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.cardContainer,
         border = cardBorder()
@@ -792,11 +863,13 @@ private fun PhotoSourceTile(
 }
 
 @Composable
-private fun ErrorNote(message: String) {
+private fun ErrorNote(message: String, modifier: Modifier = Modifier) {
     Surface(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .padding(top = TrackoraSpacing.md),
+            // Announced when it appears: it arrives in answer to a tap, often
+            // with the user's attention still on the button.
+            .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.errorContainer,
         contentColor = MaterialTheme.colorScheme.onErrorContainer
