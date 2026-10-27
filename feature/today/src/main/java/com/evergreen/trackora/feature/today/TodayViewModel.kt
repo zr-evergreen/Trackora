@@ -10,6 +10,7 @@ import com.evergreen.trackora.domain.usecase.InsertWorkEntryUseCase
 import com.evergreen.trackora.domain.usecase.UpdateWorkEntryUseCase
 import com.evergreen.trackora.util.AppConstants
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -36,6 +37,11 @@ class TodayViewModel @Inject constructor(
 
     private val today: LocalDate = LocalDate.now()
 
+    // Held so retry() replaces a subscription rather than adding a second one
+    // beside it — the error it recovers from may not have ended the first.
+    private var todayJob: Job? = null
+    private var undeliveredJob: Job? = null
+
     init {
         observeTodayEntries()
         observeUndelivered()
@@ -49,7 +55,8 @@ class TodayViewModel @Inject constructor(
      * definition not from today.
      */
     private fun observeUndelivered() {
-        viewModelScope.launch {
+        undeliveredJob?.cancel()
+        undeliveredJob = viewModelScope.launch {
             getUndeliveredWorkUseCase()
                 .catch { exception ->
                     // Surfaced rather than swallowed. An empty undelivered band
@@ -72,7 +79,8 @@ class TodayViewModel @Inject constructor(
      * Observe today's work entries.
      */
     private fun observeTodayEntries() {
-        viewModelScope.launch {
+        todayJob?.cancel()
+        todayJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
 
             getWorkEntriesByDateUseCase(today)
@@ -86,21 +94,30 @@ class TodayViewModel @Inject constructor(
                     }
                 }
                 .collect { entries ->
+                    // The error is left alone. The undelivered query reports
+                    // failures through the same field, and a fresh list of
+                    // today's entries says nothing about whether it recovered —
+                    // clearing it here would hide the failure behind an empty
+                    // band again. retry() is what clears it.
                     _uiState.update {
                         it.copy(
                             todayEntries = entries,
-                            isLoading = false,
-                            errorMessage = null
+                            isLoading = false
                         )
                     }
                 }
         }
     }
 
-    /** Re-subscribes after a load failure. The flow is cold, so collecting again retries. */
+    /**
+     * Re-subscribes after a failure. The flows are cold, so collecting again
+     * retries. Both are restarted because the error state does not say which
+     * query failed, and the undelivered one ends for good when it does.
+     */
     fun retry() {
         _uiState.update { it.copy(isLoading = true, errorMessage = null) }
         observeTodayEntries()
+        observeUndelivered()
     }
 
     fun addWorkEntry(

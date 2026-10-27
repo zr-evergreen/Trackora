@@ -10,6 +10,7 @@ import com.evergreen.trackora.domain.usecase.InsertWorkEntryUseCase
 import com.evergreen.trackora.domain.usecase.UpdateWorkEntryUseCase
 import com.evergreen.trackora.util.AppConstants
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,12 +33,17 @@ class AllWorkViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(AllWorkUiState(isLoading = true))
     val uiState: StateFlow<AllWorkUiState> = _uiState.asStateFlow()
 
+    // Held so retry() replaces the subscription rather than adding a second
+    // one: a failed write also shows the error state, and does not end it.
+    private var entriesJob: Job? = null
+
     init {
         observeEntries()
     }
 
     private fun observeEntries() {
-        viewModelScope.launch {
+        entriesJob?.cancel()
+        entriesJob = viewModelScope.launch {
             getAllWorkEntriesUseCase()
                 .catch { exception ->
                     _uiState.update {
@@ -108,7 +114,9 @@ class AllWorkViewModel @Inject constructor(
                 updateWorkEntryUseCase(entry.copy(status = next))
                 _uiState.update { it.copy(recentlyAdvanced = entry) }
             } catch (e: Exception) {
-                _uiState.update { it.copy(errorMessage = e.message) }
+                _uiState.update {
+                    it.copy(errorMessage = e.message ?: AppConstants.Errors.FAILED_TO_UPDATE_STATUS)
+                }
             }
         }
     }
@@ -120,7 +128,9 @@ class AllWorkViewModel @Inject constructor(
             try {
                 updateWorkEntryUseCase(previous)
             } catch (e: Exception) {
-                _uiState.update { it.copy(errorMessage = e.message) }
+                _uiState.update {
+                    it.copy(errorMessage = e.message ?: AppConstants.Errors.FAILED_TO_UPDATE_STATUS)
+                }
             } finally {
                 _uiState.update { it.copy(recentlyAdvanced = null) }
             }

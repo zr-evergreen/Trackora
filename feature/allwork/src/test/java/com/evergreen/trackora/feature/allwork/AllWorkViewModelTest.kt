@@ -299,4 +299,23 @@ class AllWorkViewModelTest {
         // Nothing to undo, because nothing was deleted.
         assertNull(viewModel.uiState.value.recentlyDeleted)
     }
+
+    @Test
+    fun `a failed status change without a message still surfaces an error`() = runTest {
+        // A null message used to be stored as-is, which reads as "no error":
+        // the change silently did not happen and no undo was offered either.
+        every { getAllWorkEntriesUseCase() } returns flowOf(mixedEntries)
+        coEvery { updateWorkEntryUseCase(any()) } throws RuntimeException()
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        viewModel.advanceStatus(mixedEntries.first())
+        advanceUntilIdle()
+
+        assertEquals(
+            AppConstants.Errors.FAILED_TO_UPDATE_STATUS,
+            viewModel.uiState.value.errorMessage
+        )
+        assertNull(viewModel.uiState.value.recentlyAdvanced)
+    }
 }

@@ -16,6 +16,7 @@ import io.mockk.slot
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -155,6 +156,39 @@ class TodayViewModelTest {
         viewModel.clearError()
 
         assertNull(viewModel.uiState.value.errorMessage)
+    }
+
+    @Test
+    fun `an undelivered failure survives a later emission of today's entries`() = runTest {
+        // Both queries watch the same table, so any write re-emits today's
+        // list. That must not quietly clear a failure the band cannot show.
+        val todayEntries = MutableStateFlow(emptyList<WorkEntry>())
+        every { getWorkEntriesByDateUseCase(any()) } returns todayEntries
+        every { getUndeliveredWorkUseCase() } returns
+            flow { throw RuntimeException("band query failed") }
+        val viewModel = viewModel()
+        assertEquals("band query failed", viewModel.uiState.value.errorMessage)
+
+        todayEntries.value = listOf(entry(1))
+
+        assertEquals("band query failed", viewModel.uiState.value.errorMessage)
+    }
+
+    @Test
+    fun `retry resubscribes to undelivered work as well as today's entries`() = runTest {
+        every { getWorkEntriesByDateUseCase(any()) } returns flowOf(emptyList())
+        val waiting = entry(7, status = Status.COMPLETED)
+        every { getUndeliveredWorkUseCase() } returnsMany listOf(
+            flow { throw RuntimeException("band query failed") },
+            flowOf(listOf(waiting))
+        )
+        val viewModel = viewModel()
+        assertEquals("band query failed", viewModel.uiState.value.errorMessage)
+
+        viewModel.retry()
+
+        assertNull(viewModel.uiState.value.errorMessage)
+        assertEquals(listOf(waiting), viewModel.uiState.value.undelivered)
     }
 
     // --- Validation ---------------------------------------------------------
