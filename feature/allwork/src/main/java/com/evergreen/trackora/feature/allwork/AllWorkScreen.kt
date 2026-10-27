@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Search
@@ -32,6 +33,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -172,7 +174,21 @@ fun AllWorkScreen(
             )
 
             else -> {
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                val listState = rememberLazyListState()
+                // Same reason as on Today: a lazy list holds its first visible
+                // item in place by key, so undoing the delete of the newest
+                // day's only entry restored its section above the viewport and
+                // Undo looked as if it had done nothing. A list at the top
+                // stays at the top; one scrolled down keeps its place.
+                val atTop by remember {
+                    derivedStateOf {
+                        listState.firstVisibleItemIndex == 0 &&
+                            listState.firstVisibleItemScrollOffset == 0
+                    }
+                }
+                if (atTop) listState.requestScrollToItem(0)
+
+                LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
                     uiState.sections.forEach { section ->
                         item(key = "h-${section.date}") {
                             DayHeader(date = section.date, count = section.entries.size)
