@@ -27,6 +27,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.evergreen.trackora.common.R
 import com.evergreen.trackora.domain.model.WorkEntry
+import com.evergreen.trackora.ui.isLargeTextScale
 import com.evergreen.trackora.ui.text.forUserContent
 import com.evergreen.trackora.ui.text.localizedDate
 import com.evergreen.trackora.ui.theme.TrackoraIcons
@@ -42,15 +43,15 @@ import com.evergreen.trackora.ui.theme.cardContainer
  * a one-line preview of the description follows when there is one, since that
  * is usually what distinguishes two jobs with the same name.
  *
- * Everything else sits beneath in a [FlowRow] that wraps rather than squeezes
- * — status, quantity, date, then the one forward action pushed to the end.
- * There is only ever one forward move in the lifecycle, so the row offers one
- * button rather than asking the user to re-pick the state they are looking at.
+ * Status, quantity and date sit beneath in a [FlowRow] that wraps rather than
+ * squeezes, and the one forward action sits beside the details, centred on
+ * the card — the same arrangement as the waiting rows on Today. There is only
+ * ever one forward move in the lifecycle, so the row offers one button rather
+ * than asking the user to re-pick the state they are looking at.
  *
  * The descriptive parts are one accessibility node; the action stays its own,
  * so a screen reader stops once per entry and once for its button.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun WorkEntryRow(
     entry: WorkEntry,
@@ -71,74 +72,36 @@ fun WorkEntryRow(
      */
     showAction: Boolean = true,
 ) {
+    val showButton = onAdvanceStatus != null && showAction && nextStatus(entry.status) != null
+    // At large text the button and the details cannot share a line on a
+    // narrow phone without squeezing the title to a word per line, so the
+    // button drops beneath them at full width instead.
+    val stackButton = isLargeTextScale()
+
     val content: @Composable () -> Unit = {
-        Column(
-            modifier = Modifier
-                .padding(start = 16.dp, end = 12.dp, top = 14.dp, bottom = 12.dp)
-                .semantics(mergeDescendants = true) {}
-        ) {
-            Text(
-                text = entry.title,
-                style = MaterialTheme.typography.titleMedium.forUserContent(),
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(end = 4.dp)
-            )
-
-            entry.description?.takeIf { it.isNotBlank() }?.let { description ->
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodySmall.forUserContent(),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 2.dp, end = 4.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+        Column(modifier = Modifier.padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                StatusBadge(
-                    status = entry.status,
-                    modifier = Modifier.align(Alignment.CenterVertically)
-                )
-
-                entry.quantity?.let { quantity ->
-                    MetaLabel(
-                        icon = TrackoraIcons.Quantity,
-                        text = stringResource(id = R.string.work_qty_label, quantity),
-                        modifier = Modifier.align(Alignment.CenterVertically)
-                    )
-                }
-
-                if (showDate) {
-                    MetaLabel(
-                        icon = TrackoraIcons.Calendar,
-                        text = localizedDate(entry.date),
-                        modifier = Modifier.align(Alignment.CenterVertically)
-                    )
-                }
-
-                if (onAdvanceStatus != null && showAction && nextStatus(entry.status) != null) {
-                    Spacer(modifier = Modifier.weight(1f))
+                EntryDetails(entry = entry, showDate = showDate, modifier = Modifier.weight(1f))
+                if (showButton && !stackButton && onAdvanceStatus != null) {
                     StatusActionButton(
                         currentStatus = entry.status,
                         entryTitle = entry.title,
-                        onClick = onAdvanceStatus,
-                        modifier = Modifier.align(Alignment.CenterVertically)
+                        onClick = onAdvanceStatus
                     )
                 }
+            }
+            if (showButton && stackButton && onAdvanceStatus != null) {
+                StatusActionButton(
+                    currentStatus = entry.status,
+                    entryTitle = entry.title,
+                    onClick = onAdvanceStatus,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 10.dp)
+                )
             }
         }
     }
@@ -160,6 +123,70 @@ fun WorkEntryRow(
     } else {
         Surface(modifier = cardModifier, shape = shape, color = color, border = border) {
             content()
+        }
+    }
+}
+
+/** Title, description preview and the status line: one accessibility stop. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun EntryDetails(
+    entry: WorkEntry,
+    showDate: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.semantics(mergeDescendants = true) {}) {
+        Text(
+            text = entry.title,
+            style = MaterialTheme.typography.titleMedium.forUserContent(),
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            // Full width so a title in the other script can align to its own
+            // start: a Persian title in the English build sits on the right.
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        entry.description?.takeIf { it.isNotBlank() }?.let { description ->
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall.forUserContent(),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 2.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            StatusBadge(
+                status = entry.status,
+                modifier = Modifier.align(Alignment.CenterVertically)
+            )
+
+            entry.quantity?.let { quantity ->
+                MetaLabel(
+                    icon = TrackoraIcons.Quantity,
+                    text = stringResource(id = R.string.work_qty_label, quantity),
+                    modifier = Modifier.align(Alignment.CenterVertically)
+                )
+            }
+
+            if (showDate) {
+                MetaLabel(
+                    icon = TrackoraIcons.Calendar,
+                    text = localizedDate(entry.date),
+                    modifier = Modifier.align(Alignment.CenterVertically)
+                )
+            }
         }
     }
 }

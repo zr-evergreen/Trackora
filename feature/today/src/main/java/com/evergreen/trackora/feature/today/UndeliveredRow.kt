@@ -108,7 +108,8 @@ private fun UndeliveredDetails(entry: WorkEntry, modifier: Modifier = Modifier) 
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 2,
-            overflow = TextOverflow.Ellipsis
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth()
         )
         Row(
             modifier = Modifier.padding(top = 2.dp),
