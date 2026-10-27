@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -22,6 +23,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -156,7 +158,21 @@ private fun TodayList(
     onEntryClick: (Long) -> Unit,
     onSeeAllUndelivered: () -> Unit,
 ) {
+    val listState = rememberLazyListState()
+    // A lazy list holds its first visible item in place by key. So when the
+    // band appears above "Today's work" — the moment the user completes a job
+    // — it is inserted above the viewport and stays out of sight, with
+    // nothing to say the list is scrolled. A list that was at the top stays at
+    // the top instead; one the user has scrolled down keeps its place.
+    val atTop by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
+        }
+    }
+    if (atTop) listState.requestScrollToItem(0)
+
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 96.dp)
     ) {
