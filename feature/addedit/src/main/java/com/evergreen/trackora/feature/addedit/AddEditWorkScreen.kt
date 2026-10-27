@@ -78,9 +78,7 @@ import com.evergreen.trackora.util.AppConstants
 import com.evergreen.trackora.util.JalaliCalendar
 import java.io.File
 import java.text.SimpleDateFormat
-import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneId
 import java.util.Date
 import java.util.Locale
 
@@ -455,11 +453,10 @@ fun AddEditWorkScreen(
                 )
             } else {
                 // Use standard Gregorian date picker
+                // UTC both ways; see DatePickerDates for why the device zone
+                // moved the date back a day in Iran.
                 val datePickerState = rememberDatePickerState(
-                    initialSelectedDateMillis = uiState.date
-                        .atStartOfDay(ZoneId.systemDefault())
-                        .toInstant()
-                        .toEpochMilli()
+                    initialSelectedDateMillis = DatePickerDates.toPickerMillis(uiState.date)
                 )
 
                 DatePickerDialog(
@@ -468,10 +465,7 @@ fun AddEditWorkScreen(
                         TextButton(
                             onClick = {
                                 datePickerState.selectedDateMillis?.let { millis ->
-                                    val selectedDate = Instant.ofEpochMilli(millis)
-                                        .atZone(ZoneId.systemDefault())
-                                        .toLocalDate()
-                                    viewModel.onDateChange(selectedDate)
+                                    viewModel.onDateChange(DatePickerDates.fromPickerMillis(millis))
                                 }
                             }
                         ) {
