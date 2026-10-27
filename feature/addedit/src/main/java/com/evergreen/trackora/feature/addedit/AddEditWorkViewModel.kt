@@ -1,5 +1,6 @@
 package com.evergreen.trackora.feature.addedit
 
+import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -31,6 +32,7 @@ class AddEditWorkViewModel @Inject constructor(
     private val insertWorkEntryUseCase: InsertWorkEntryUseCase,
     private val updateWorkEntryUseCase: UpdateWorkEntryUseCase,
     private val getWorkEntryByIdUseCase: GetWorkEntryByIdUseCase,
+    private val galleryPhotoImporter: GalleryPhotoImporter,
     customFieldsManager: CustomFieldsManager,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -144,6 +146,24 @@ class AddEditWorkViewModel @Inject constructor(
                 errorMessage = null,
                 isSaved = false
             )
+        }
+    }
+
+    /**
+     * Attaches a photo picked from the gallery by copying it into app storage
+     * first. The picker's own URI stops being readable once the app restarts;
+     * see [GalleryPhotoImporter].
+     */
+    fun onGalleryPhotoPicked(source: Uri) {
+        viewModelScope.launch {
+            val copied = galleryPhotoImporter.import(source)
+            if (copied != null) {
+                onPhotoSelected(copied)
+            } else {
+                _uiState.update {
+                    it.copy(errorMessage = AppConstants.Errors.FAILED_TO_ATTACH_PHOTO)
+                }
+            }
         }
     }
 

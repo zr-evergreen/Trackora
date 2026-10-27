@@ -141,9 +141,9 @@ fun AddEditWorkScreen(
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        uri?.let {
-            viewModel.onPhotoSelected(it.toString())
-        }
+        // Copied into app storage rather than stored as-is: the picker's URI
+        // is only readable until the app restarts.
+        uri?.let { viewModel.onGalleryPhotoPicked(it) }
     }
 
     // Public function to launch camera (with permission check)

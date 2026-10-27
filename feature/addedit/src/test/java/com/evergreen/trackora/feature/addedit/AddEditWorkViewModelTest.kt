@@ -1,5 +1,6 @@
 package com.evergreen.trackora.feature.addedit
 
+import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.evergreen.trackora.domain.model.Status
@@ -47,6 +48,7 @@ class AddEditWorkViewModelTest {
     private val updateWorkEntryUseCase = mockk<UpdateWorkEntryUseCase>(relaxed = true)
     private val getWorkEntryByIdUseCase = mockk<GetWorkEntryByIdUseCase>()
     private val customFieldsManager = mockk<CustomFieldsManager>()
+    private val galleryPhotoImporter = mockk<GalleryPhotoImporter>()
 
     private val existingEntry = WorkEntry(
         id = 12L,
@@ -72,6 +74,7 @@ class AddEditWorkViewModelTest {
             insertWorkEntryUseCase = insertWorkEntryUseCase,
             updateWorkEntryUseCase = updateWorkEntryUseCase,
             getWorkEntryByIdUseCase = getWorkEntryByIdUseCase,
+            galleryPhotoImporter = galleryPhotoImporter,
             customFieldsManager = customFieldsManager,
             savedStateHandle = savedStateHandle
         )
@@ -388,6 +391,40 @@ class AddEditWorkViewModelTest {
 
         coVerify { insertWorkEntryUseCase(capture(entry)) }
         assertNull(entry.captured.photoUri)
+    }
+
+    @Test
+    fun `a gallery photo is saved as the app's own copy, not the picker's URI`() = runTest {
+        // The picker's URI is readable only until the app restarts; storing it
+        // left an empty photo card on every later visit.
+        val picked = mockk<Uri>()
+        coEvery { galleryPhotoImporter.import(picked) } returns
+            "content://com.evergreen.trackora.fileprovider/external_files/IMG_1_gallery.jpg"
+        val vm = viewModel()
+        vm.onTitleChange("With gallery photo")
+
+        vm.onGalleryPhotoPicked(picked)
+        val entry = slot<WorkEntry>()
+        vm.save()
+
+        coVerify { insertWorkEntryUseCase(capture(entry)) }
+        assertEquals(
+            "content://com.evergreen.trackora.fileprovider/external_files/IMG_1_gallery.jpg",
+            entry.captured.photoUri
+        )
+    }
+
+    @Test
+    fun `a gallery photo that cannot be copied is reported and leaves the photo unchanged`() = runTest {
+        val picked = mockk<Uri>()
+        coEvery { galleryPhotoImporter.import(picked) } returns null
+        val vm = viewModel()
+        vm.onPhotoSelected("content://photo/1")
+
+        vm.onGalleryPhotoPicked(picked)
+
+        assertEquals("content://photo/1", vm.uiState.value.photoUri)
+        assertEquals(AppConstants.Errors.FAILED_TO_ATTACH_PHOTO, vm.uiState.value.errorMessage)
     }
 
     @Test
