@@ -9,10 +9,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusTarget
 import androidx.compose.ui.res.painterResource
@@ -50,7 +53,12 @@ fun NavGraph(
     val isAddEdit = currentRoute.contains("AddEditWorkRoute")
     val showBottomNav = currentRoute.isEmpty() || (!isAddEdit)
     val showFab = currentRoute.contains("TodayRoute")
-    
+
+    // Today's snackbars go through the Scaffold rather than a host inside the
+    // screen, so the Scaffold places them above the add button instead of
+    // under it, where the button covered Undo.
+    val todaySnackbarHostState = remember { SnackbarHostState() }
+
     androidx.compose.material3.Scaffold(
         // Android 8.1 and below give a window initial focus even in touch
         // mode, and Compose passes it to the first focusable node — on Today,
@@ -60,6 +68,7 @@ fun NavGraph(
         // everything is the first focusable node instead, so stray focus
         // lands here. It carries no semantics, so screen readers ignore it.
         modifier = Modifier.focusTarget(),
+        snackbarHost = { SnackbarHost(hostState = todaySnackbarHostState) },
         bottomBar = {
             if (showBottomNav) {
                 BottomNavigationBar(navController = navController)
@@ -87,6 +96,7 @@ fun NavGraph(
             // Feature navigation graphs
             todayNavigation(
                 contentPadding = paddingValues,
+                snackbarHostState = todaySnackbarHostState,
                 // The band shows only the oldest few; the rest live in the
                 // history, where the Completed filter and search already exist.
                 onSeeAllUndelivered = {
