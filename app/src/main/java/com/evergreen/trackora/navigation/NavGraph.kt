@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusTarget
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -51,6 +52,14 @@ fun NavGraph(
     val showFab = currentRoute.contains("TodayRoute")
     
     androidx.compose.material3.Scaffold(
+        // Android 8.1 and below give a window initial focus even in touch
+        // mode, and Compose passes it to the first focusable node — on Today,
+        // the quick-add field. When a focused node later leaves with its
+        // screen, focus is reassigned the same way and the next screen's first
+        // text field opens the keyboard unasked. A focus target around
+        // everything is the first focusable node instead, so stray focus
+        // lands here. It carries no semantics, so screen readers ignore it.
+        modifier = Modifier.focusTarget(),
         bottomBar = {
             if (showBottomNav) {
                 BottomNavigationBar(navController = navController)

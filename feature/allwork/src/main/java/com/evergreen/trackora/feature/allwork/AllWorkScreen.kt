@@ -1,6 +1,5 @@
 package com.evergreen.trackora.feature.allwork
 
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
@@ -41,8 +40,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
@@ -76,12 +73,6 @@ fun AllWorkScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
-    // The search field is the first focusable element here, so on the first
-    // navigation to this screen Compose hands it initial focus and the keyboard
-    // covers half the list before the user has asked to search anything.
-    // Parking focus on the container instead leaves the field unfocused until
-    // it is actually tapped. clearFocus() does not work for this — it runs
-    // before the field claims focus, not after.
     // Applied once per arrival, not on every recomposition, so the user can
     // still clear the filter on a screen they were sent to with one set.
     // Saveable, because opening an entry and coming back re-enters
@@ -94,9 +85,6 @@ fun AllWorkScreen(
             initialStatusApplied = true
         }
     }
-
-    val initialFocus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { initialFocus.requestFocus() }
 
     val deletedTitle = uiState.recentlyDeleted?.title
     val deletedMessage = deletedTitle?.let { stringResource(id = R.string.entry_deleted, it) }
@@ -133,12 +121,7 @@ fun AllWorkScreen(
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .focusRequester(initialFocus)
-            .focusable()
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
     TrackoraScreenContainer(
         modifier = Modifier
             .fillMaxSize()
