@@ -29,7 +29,6 @@
     <string name="today_undo">بازگرداندن</string>
     <string name="today_empty_body">اولین کار امروز را از بالا اضافه کنید.</string>
     <string name="today_summary_line">%1$d کار تمام‌شده · %2$d عدد</string>
-    <string name="action_mark_complete">تکمیل شد</string>
     <string name="today_quick_add_qty">تعداد</string>
     <string name="today_see_all_undelivered">دیدن همه %1$d مورد</string>
 </resources>
