@@ -31,13 +31,14 @@
 
     <string name="settings_section_data">داده‌ها</string>
     <string name="settings_section_data_desc">یک نسخه از داده‌های کار خود برای استفاده در ابزارهای دیگر بسازید.</string>
-    <string name="settings_export_data_label">خروجی گرفتن داده‌های کار (CSV یا JSON)</string>
+    <string name="settings_export_data_label">خروجی گرفتن داده‌های کار (CSV)</string>
 
     <string name="settings_section_about">درباره برنامه</string>
     <string name="settings_section_about_desc">اطلاعات کلی درباره این برنامه.</string>
     <string name="settings_about_version_label">نسخه برنامه</string>
 
     <!-- Notification strings (Farsi) -->
+    <string name="notification_channel_name">یادآوری روزانه</string>
     <string name="notification_channel_description">یادآوری روزانه کارهای آماده تحویل</string>
     <string name="notification_undelivered_title">آماده تحویل</string>
     <plurals name="notification_undelivered_message">

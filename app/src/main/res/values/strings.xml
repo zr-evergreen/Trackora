@@ -31,13 +31,14 @@
 
     <string name="settings_section_data">Data</string>
     <string name="settings_section_data_desc">Create a copy of your work data that you can open in other tools.</string>
-    <string name="settings_export_data_label">Export work data (CSV or JSON)</string>
+    <string name="settings_export_data_label">Export work data (CSV)</string>
 
     <string name="settings_section_about">About</string>
     <string name="settings_section_about_desc">Basic information about this app.</string>
     <string name="settings_about_version_label">Version</string>
 
     <!-- Notification strings -->
+    <string name="notification_channel_name">Daily reminders</string>
     <string name="notification_channel_description">Daily reminders about work waiting to be delivered</string>
     <string name="notification_undelivered_title">Waiting to be delivered</string>
     <plurals name="notification_undelivered_message">
