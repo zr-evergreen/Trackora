@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavController
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -108,7 +109,7 @@ fun NavGraph(
                     fadeOut(tween(TrackoraMotion.SHORT))
             ) {
                 FloatingActionButton(
-                    onClick = { navController.navigate(AddEditWorkRoute()) },
+                    onClick = { navController.openNewEntry() },
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 ) {
@@ -184,6 +185,20 @@ fun NavGraph(
             }
         }
     }
+}
+
+/**
+ * Opens a blank entry form, but only from Today.
+ *
+ * The add button animates out rather than vanishing, so it is still tappable
+ * for a moment after the first tap has navigated, and a quick double tap
+ * stacked a second empty form on the first. Navigating moves the current
+ * destination at once, so the second tap now finds the form already open and
+ * does nothing.
+ */
+internal fun NavController.openNewEntry() {
+    if (currentDestination?.route?.contains("TodayRoute") != true) return
+    navigate(AddEditWorkRoute())
 }
 
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.fadeThroughIn(): EnterTransition =
