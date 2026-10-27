@@ -11,6 +11,8 @@
     <string name="reports_delta_down">%1$s fewer than the period before</string>
     <string name="reports_empty_title">Nothing recorded yet</string>
     <string name="reports_empty_body">Work you record will be summarised here.</string>
+    <!-- What the selected window covers, under the title. -->
+    <string name="reports_period_daily">Today</string>
+    <string name="reports_period_weekly">Last 7 days</string>
+    <string name="reports_period_monthly">Last 30 days</string>
 </resources>
-
-
