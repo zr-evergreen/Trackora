@@ -8,7 +8,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Initializes and manages the periodic work for checking in-progress works.
+ * Schedules the daily reminder about finished work that has not been delivered.
  */
 @Singleton
 class WorkManagerInitializer @Inject constructor() {
@@ -18,16 +18,15 @@ class WorkManagerInitializer @Inject constructor() {
         // The 15-minute job an installed build may still have queued.
         // Cancelled on next launch so upgrades stop being spammed.
         private const val LEGACY_WORK_NAME = "in_progress_work_checker"
-        // Android enforces a minimum interval of 15 minutes for periodic work
-        // Note: User requested 10 minutes, but 15 minutes is the closest we can achieve
+        // One day, in TimeUnit.DAYS below.
         private val REPEAT_INTERVAL = 1L
     }
     
     /**
-     * Starts the periodic work that checks for in-progress works every 15 minutes.
-     * Runs once a day. It used to run every fifteen minutes, which is the
-     * platform minimum and posted up to ninety-six notifications a day to
-     * anyone with a single open job — the fastest way to be uninstalled.
+     * Starts the reminder, once a day. It used to run every fifteen minutes,
+     * which is the platform minimum and posted up to ninety-six notifications
+     * a day to anyone with a single open job — the fastest way to be
+     * uninstalled.
      */
     fun startPeriodicCheck(workManager: WorkManager) {
         workManager.cancelUniqueWork(LEGACY_WORK_NAME)

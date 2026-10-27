@@ -76,25 +76,6 @@ class AllWorkViewModel @Inject constructor(
         _uiState.update { it.copy(filter = status) }
     }
 
-    /**
-     * Deletes [entry] and keeps it in state so it can be put back.
-     *
-     * Undo re-inserts rather than soft-deleting. A deleted-flag column would
-     * mean every query in the app grows a filter and a stale row lingers in
-     * the database forever; re-insert keeps the schema honest and the window
-     * for it is only as long as the snackbar.
-     *
-     * The re-inserted row gets a new id, which is invisible to the user — ids
-     * are not shown anywhere and nothing references an entry by id across a
-     * session.
-     */
-    /**
-     * Moves [entry] one step along the lifecycle, matching Today.
-     *
-     * All Work previously offered no way to change a status at all — the user
-     * had to open the entry and use the form. Since this is the screen where
-     * older work is found, it is exactly where a forgotten job gets delivered.
-     */
     fun setQuery(query: String) {
         _uiState.update { it.copy(query = query) }
     }
@@ -103,6 +84,13 @@ class AllWorkViewModel @Inject constructor(
         _uiState.update { it.copy(query = "") }
     }
 
+    /**
+     * Moves [entry] one step along the lifecycle, matching Today.
+     *
+     * All Work previously offered no way to change a status at all — the user
+     * had to open the entry and use the form. Since this is the screen where
+     * older work is found, it is exactly where a forgotten job gets delivered.
+     */
     fun advanceStatus(entry: WorkEntry) {
         val next = when (entry.status) {
             Status.IN_PROGRESS -> Status.COMPLETED
@@ -141,6 +129,18 @@ class AllWorkViewModel @Inject constructor(
         _uiState.update { it.copy(recentlyAdvanced = null) }
     }
 
+    /**
+     * Deletes [entry] and keeps it in state so it can be put back.
+     *
+     * Undo re-inserts rather than soft-deleting. A deleted-flag column would
+     * mean every query in the app grows a filter and a stale row lingers in
+     * the database forever; re-insert keeps the schema honest and the window
+     * for it is only as long as the snackbar.
+     *
+     * The re-inserted row gets a new id, which is invisible to the user — ids
+     * are not shown anywhere and nothing references an entry by id across a
+     * session.
+     */
     fun deleteEntry(entry: WorkEntry) {
         viewModelScope.launch {
             try {
