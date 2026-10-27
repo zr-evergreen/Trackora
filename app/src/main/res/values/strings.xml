@@ -34,7 +34,6 @@
     <string name="settings_export_data_label">Export work data (CSV)</string>
 
     <string name="settings_section_about">About</string>
-    <string name="settings_section_about_desc">Basic information about this app.</string>
     <string name="settings_about_version_label">Version</string>
 
     <!-- Notification strings -->

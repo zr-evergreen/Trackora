@@ -34,7 +34,6 @@
     <string name="settings_export_data_label">خروجی گرفتن داده‌های کار (CSV)</string>
 
     <string name="settings_section_about">درباره برنامه</string>
-    <string name="settings_section_about_desc">اطلاعات کلی درباره این برنامه.</string>
     <string name="settings_about_version_label">نسخه برنامه</string>
 
     <!-- Notification strings (Farsi) -->
