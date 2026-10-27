@@ -56,6 +56,23 @@ class PersianSearchTest {
         assertTrue(PersianSearch.matches("تکمیلشده", "تکمیل‌شده"))
     }
 
+    @Test
+    fun `a query with a space finds text written with a half-space`() {
+        // The case the class note promises: a keyboard with no half-space key
+        // produces «تکمیل شده» for a word stored as «تکمیل‌شده».
+        assertTrue(PersianSearch.matches("تکمیل‌شده", "تکمیل شده"))
+    }
+
+    @Test
+    fun `a query with a half-space finds text written with a space`() {
+        assertTrue(PersianSearch.matches("تکمیل شده", "تکمیل‌شده"))
+    }
+
+    @Test
+    fun `a query run together finds text written with a space`() {
+        assertTrue(PersianSearch.matches("می خواهم", "میخواهم"))
+    }
+
     // --- Digits --------------------------------------------------------------
 
     @Test

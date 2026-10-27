@@ -71,12 +71,20 @@ object PersianSearch {
     /**
      * Whether [haystack] contains [needle], with both sides folded.
      *
+     * Whitespace is ignored too, so a word joined with a half-space, split with
+     * a space or run together matches in every combination: [normalize] drops
+     * the half-space and this drops the space. The cost is that a query can
+     * match across a word boundary, which on one person's log means at worst
+     * an extra row.
+     *
      * A blank query matches everything, so callers can pass the raw field
      * without special-casing an empty search box.
      */
     fun matches(haystack: String?, needle: String): Boolean {
         if (needle.isBlank()) return true
         if (haystack.isNullOrEmpty()) return false
-        return normalize(haystack).contains(normalize(needle))
+        return normalize(haystack).withoutSpaces().contains(normalize(needle).withoutSpaces())
     }
+
+    private fun String.withoutSpaces(): String = filterNot { it.isWhitespace() }
 }
