@@ -41,6 +41,15 @@ interface WorkEntryDao {
     @Query("SELECT COUNT(*) FROM work_entries WHERE date >= :startDate AND date <= :endDate")
     fun getEntryCountByDateRange(startDate: LocalDate, endDate: LocalDate): Flow<Int>
     
+    /**
+     * Observes entries in one status, oldest first.
+     *
+     * Ascending by date on purpose: this drives the undelivered list, where the
+     * job that has been waiting longest is the one most worth chasing.
+     */
+    @Query("SELECT * FROM work_entries WHERE status = :status ORDER BY date ASC, id ASC")
+    fun observeEntriesByStatus(status: String): Flow<List<WorkEntry>>
+
     @Query("SELECT * FROM work_entries WHERE status = :status")
     suspend fun getEntriesByStatus(status: String): List<WorkEntry>
 }

@@ -44,12 +44,12 @@ class NotificationHelper(private val context: Context) {
     }
     
     /**
-     * Shows a notification when there are in-progress works.
+     * Shows the daily reminder about work that is finished but not yet delivered.
      */
-    fun showInProgressWorkNotification(count: Int) {
-        val title = context.getString(R.string.notification_in_progress_title)
+    fun showUndeliveredWorkNotification(count: Int) {
+        val title = context.getString(R.string.notification_undelivered_title)
         val message = context.resources.getQuantityString(
-            R.plurals.notification_in_progress_message,
+            R.plurals.notification_undelivered_message,
             count,
             count
         )

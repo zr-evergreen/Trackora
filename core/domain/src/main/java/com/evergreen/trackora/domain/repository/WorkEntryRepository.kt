@@ -66,5 +66,10 @@ interface WorkEntryRepository {
      * Get work entries by status.
      */
     suspend fun getEntriesByStatus(status: Status): List<WorkEntry>
+
+    /**
+     * Observe work entries in one status, oldest first.
+     */
+    fun observeEntriesByStatus(status: Status): Flow<List<WorkEntry>>
 }
 

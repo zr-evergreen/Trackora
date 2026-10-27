@@ -37,8 +37,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
@@ -71,6 +69,8 @@ import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.evergreen.trackora.domain.model.Status
+import com.evergreen.trackora.ui.components.TrackoraFilterChip
+import com.evergreen.trackora.ui.components.TrackoraFilterRow
 import com.evergreen.trackora.ui.components.JalaliDatePickerDialog
 import com.evergreen.trackora.ui.text.forUserContent
 import com.evergreen.trackora.ui.text.localizedRelativeDate
@@ -496,36 +496,16 @@ private fun StatusSelector(
     selected: Status,
     onSelected: (Status) -> Unit
 ) {
-    val scrollState = rememberScrollState()
-    
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(scrollState),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Status.values().forEach { status ->
-            FilterChip(
-                selected = status == selected,
-                onClick = { onSelected(status) },
-                label = {
-                    Text(
-                        text = when (status) {
-                            Status.IN_PROGRESS -> stringResource(id = R.string.status_in_progress)
-                            Status.COMPLETED -> stringResource(id = R.string.status_completed)
-                            Status.DELIVERED -> stringResource(id = R.string.status_delivered)
-                        },
-                        style = MaterialTheme.typography.labelMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Visible
-                    )
+    TrackoraFilterRow {
+        Status.entries.forEach { status ->
+            TrackoraFilterChip(
+                label = when (status) {
+                    Status.IN_PROGRESS -> stringResource(id = R.string.status_in_progress)
+                    Status.COMPLETED -> stringResource(id = R.string.status_completed)
+                    Status.DELIVERED -> stringResource(id = R.string.status_delivered)
                 },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ),
-                modifier = Modifier.height(40.dp)
+                selected = status == selected,
+                onClick = { onSelected(status) }
             )
         }
     }
@@ -589,8 +569,10 @@ private fun PhotoSelector(
         // Show selected photo
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            // Token, not a literal: TrackoraShapes defines the app's radii and
+            // this was the last call site setting its own.
+            shape = MaterialTheme.shapes.small,
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
         ) {
             Box {
                 AsyncImage(

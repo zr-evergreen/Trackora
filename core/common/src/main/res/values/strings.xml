@@ -32,4 +32,18 @@
          control from the day control. -->
     <string name="date_picker_decrease">Decrease %1$s</string>
     <string name="date_picker_increase">Increase %1$s</string>
+
+    <!-- Shared loading/empty/error states. -->
+    <string name="state_error_title">Something went wrong</string>
+    <string name="state_error_body">Your work is safe. This screen could not load just now.</string>
+    <string name="state_retry">Try again</string>
+    <string name="status_in_progress">In Progress</string>
+    <string name="status_completed">Completed</string>
+    <string name="status_delivered">Delivered</string>
+
+    <!-- Shared work-entry row. Lived per feature module until the row itself
+         was shared; kept here so both lists say the same thing. -->
+    <string name="work_qty_label">Qty: %1$d</string>
+    <string name="action_mark_complete">Completed</string>
+    <string name="action_mark_delivered">Delivered</string>
 </resources>

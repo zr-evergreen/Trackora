@@ -3,8 +3,13 @@ package com.evergreen.trackora.feature.allwork
 import app.cash.turbine.test
 import com.evergreen.trackora.domain.model.Status
 import com.evergreen.trackora.domain.model.WorkEntry
+import com.evergreen.trackora.domain.usecase.DeleteWorkEntryUseCase
 import com.evergreen.trackora.domain.usecase.GetAllWorkEntriesUseCase
+import com.evergreen.trackora.domain.usecase.InsertWorkEntryUseCase
+import com.evergreen.trackora.domain.usecase.UpdateWorkEntryUseCase
 import com.evergreen.trackora.util.AppConstants
+import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -31,6 +36,8 @@ class AllWorkViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     private val getAllWorkEntriesUseCase: GetAllWorkEntriesUseCase = mockk()
+    private val deleteWorkEntryUseCase: DeleteWorkEntryUseCase = mockk(relaxed = true)
+    private val insertWorkEntryUseCase: InsertWorkEntryUseCase = mockk(relaxed = true)
 
     private fun entry(id: Long, status: Status) = WorkEntry(
         id = id,
@@ -46,7 +53,14 @@ class AllWorkViewModelTest {
         entry(4, Status.DELIVERED)
     )
 
-    private fun viewModel() = AllWorkViewModel(getAllWorkEntriesUseCase)
+    private val updateWorkEntryUseCase: UpdateWorkEntryUseCase = mockk(relaxed = true)
+
+    private fun viewModel() = AllWorkViewModel(
+        getAllWorkEntriesUseCase,
+        deleteWorkEntryUseCase,
+        insertWorkEntryUseCase,
+        updateWorkEntryUseCase
+    )
 
     // --- Loading ------------------------------------------------------------
 
@@ -206,5 +220,102 @@ class AllWorkViewModelTest {
         // A refresh from the database must not silently reset the user's filter.
         assertEquals(Status.COMPLETED, viewModel.uiState.value.filter)
         assertEquals(3, viewModel.uiState.value.filteredEntries.size)
+    }
+
+    // --- Delete and undo ----------------------------------------------------
+
+    @Test
+    fun `deleting an entry removes it and holds it for undo`() = runTest {
+        every { getAllWorkEntriesUseCase() } returns flowOf(mixedEntries)
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        val target = mixedEntries.first()
+        viewModel.deleteEntry(target)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { deleteWorkEntryUseCase(target) }
+        // Held so the snackbar has something to put back.
+        assertEquals(target, viewModel.uiState.value.recentlyDeleted)
+    }
+
+    @Test
+    fun `undo re-inserts the entry with a fresh id`() = runTest {
+        every { getAllWorkEntriesUseCase() } returns flowOf(mixedEntries)
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        val target = mixedEntries.first()
+        viewModel.deleteEntry(target)
+        advanceUntilIdle()
+        viewModel.undoDelete()
+        advanceUntilIdle()
+
+        // id = 0 so Room autogenerates; reusing the old id would collide if
+        // anything had taken it in the meantime.
+        coVerify(exactly = 1) { insertWorkEntryUseCase(target.copy(id = 0)) }
+        assertNull(viewModel.uiState.value.recentlyDeleted)
+    }
+
+    @Test
+    fun `undo with nothing deleted does nothing`() = runTest {
+        every { getAllWorkEntriesUseCase() } returns flowOf(mixedEntries)
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        viewModel.undoDelete()
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { insertWorkEntryUseCase(any()) }
+    }
+
+    @Test
+    fun `dismissing the snackbar drops the held entry so it cannot be restored later`() = runTest {
+        every { getAllWorkEntriesUseCase() } returns flowOf(mixedEntries)
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        viewModel.deleteEntry(mixedEntries.first())
+        advanceUntilIdle()
+        viewModel.clearRecentlyDeleted()
+        viewModel.undoDelete()
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.recentlyDeleted)
+        coVerify(exactly = 0) { insertWorkEntryUseCase(any()) }
+    }
+
+    @Test
+    fun `a failed delete surfaces an error and holds nothing`() = runTest {
+        every { getAllWorkEntriesUseCase() } returns flowOf(mixedEntries)
+        coEvery { deleteWorkEntryUseCase(any()) } throws RuntimeException("disk full")
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        viewModel.deleteEntry(mixedEntries.first())
+        advanceUntilIdle()
+
+        assertEquals("disk full", viewModel.uiState.value.errorMessage)
+        // Nothing to undo, because nothing was deleted.
+        assertNull(viewModel.uiState.value.recentlyDeleted)
+    }
+
+    @Test
+    fun `a failed status change without a message still surfaces an error`() = runTest {
+        // A null message used to be stored as-is, which reads as "no error":
+        // the change silently did not happen and no undo was offered either.
+        every { getAllWorkEntriesUseCase() } returns flowOf(mixedEntries)
+        coEvery { updateWorkEntryUseCase(any()) } throws RuntimeException()
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        viewModel.advanceStatus(mixedEntries.first())
+        advanceUntilIdle()
+
+        assertEquals(
+            AppConstants.Errors.FAILED_TO_UPDATE_STATUS,
+            viewModel.uiState.value.errorMessage
+        )
+        assertNull(viewModel.uiState.value.recentlyAdvanced)
     }
 }

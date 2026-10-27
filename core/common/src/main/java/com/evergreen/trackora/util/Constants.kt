@@ -24,6 +24,8 @@ object AppConstants {
         const val FAILED_TO_LOAD = "Failed to load entry"
         const val FAILED_TO_SAVE = "Unable to save entry"
         const val FAILED_TO_LOAD_ENTRIES = "Failed to load entries"
+        const val FAILED_TO_DELETE_ENTRY = "Failed to delete entry"
+        const val FAILED_TO_RESTORE_ENTRY = "Failed to restore entry"
         const val FAILED_TO_ADD = "Failed to add entry"
         const val FAILED_TO_UPDATE = "Failed to update entry"
         const val FAILED_TO_UPDATE_STATUS = "Failed to update status"

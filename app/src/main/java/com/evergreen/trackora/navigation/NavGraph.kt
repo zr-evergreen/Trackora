@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusTarget
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -26,6 +27,7 @@ import androidx.navigation.toRoute
 import com.evergreen.trackora.feature.addedit.AddEditWorkScreen
 import com.evergreen.trackora.feature.allwork.allWorkNavigation
 import com.evergreen.trackora.feature.reports.reportsNavigation
+import com.evergreen.trackora.domain.model.Status
 import com.evergreen.trackora.feature.today.todayNavigation
 import com.evergreen.trackora.ui.settings.SettingsScreen
 import com.evergreen.trackora.R
@@ -50,6 +52,14 @@ fun NavGraph(
     val showFab = currentRoute.contains("TodayRoute")
     
     androidx.compose.material3.Scaffold(
+        // Android 8.1 and below give a window initial focus even in touch
+        // mode, and Compose passes it to the first focusable node — on Today,
+        // the quick-add field. When a focused node later leaves with its
+        // screen, focus is reassigned the same way and the next screen's first
+        // text field opens the keyboard unasked. A focus target around
+        // everything is the first focusable node instead, so stray focus
+        // lands here. It carries no semantics, so screen readers ignore it.
+        modifier = Modifier.focusTarget(),
         bottomBar = {
             if (showBottomNav) {
                 BottomNavigationBar(navController = navController)
@@ -76,7 +86,25 @@ fun NavGraph(
         ) {
             // Feature navigation graphs
             todayNavigation(
-                contentPadding = paddingValues
+                contentPadding = paddingValues,
+                // The band shows only the oldest few; the rest live in the
+                // history, where the Completed filter and search already exist.
+                onSeeAllUndelivered = {
+                    // Once All Work has been visited from the bottom bar its
+                    // state is saved, and restoring it brings back the
+                    // arguments it was saved with — dropping the filter passed
+                    // here. Discard that saved state and open it fresh instead.
+                    navController.clearBackStack<AllWorkRoute>()
+                    navController.navigate(AllWorkRoute(initialStatus = Status.COMPLETED.name)) {
+                        launchSingleTop = true
+                    }
+                },
+                // Rows on Today are now tappable. Previously the only way to
+                // open an entry was via All Work, which users had no reason to
+                // discover.
+                onEntryClick = { entryId ->
+                    navController.navigate(AddEditWorkRoute(entryId = entryId))
+                }
             )
             
             allWorkNavigation(
@@ -169,7 +197,7 @@ private fun BottomNavigationBar(
                 it.route?.contains("AllWorkRoute") == true 
             } == true,
             onClick = {
-                navController.navigate(AllWorkRoute) {
+                navController.navigate(AllWorkRoute()) {
                     popUpTo(navController.graph.findStartDestination().id) {
                         saveState = true
                     }
