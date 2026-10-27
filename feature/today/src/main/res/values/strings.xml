@@ -26,7 +26,6 @@
     <string name="today_quick_add_action">Add</string>
     <string name="today_section_undelivered">Waiting to be delivered</string>
     <string name="today_section_today">Today’s work</string>
-    <string name="today_deliver">Delivered</string>
     <string name="today_status_changed_toast">“%1$s” updated</string>
     <string name="today_undo">Undo</string>
     <string name="today_empty_body">Add the first job of the day above.</string>

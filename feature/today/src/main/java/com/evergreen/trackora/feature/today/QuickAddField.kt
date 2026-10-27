@@ -1,22 +1,27 @@
 package com.evergreen.trackora.feature.today
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,13 +32,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.evergreen.trackora.util.PersianDigits
 import com.evergreen.trackora.ui.isLargeTextScale
 import com.evergreen.trackora.ui.text.forUserContent
+import com.evergreen.trackora.ui.theme.TrackoraIcons
+import com.evergreen.trackora.ui.theme.TrackoraMotion
+import com.evergreen.trackora.ui.theme.cardContainer
+import com.evergreen.trackora.util.PersianDigits
 
 /**
  * One-line capture for a new job.
@@ -61,8 +71,8 @@ import com.evergreen.trackora.ui.text.forUserContent
  * count. Capturing a title without it produces a record that cannot answer the
  * question the user opened the app to answer.
  *
- * It is optional and visually secondary — narrow, unlabelled until focused,
- * and skipped entirely by pressing Done from the title.
+ * It is optional and visually secondary — narrow, after a divider, and skipped
+ * entirely by pressing Done from the title.
  *
  * Deliberately not parsed out of the title. Reading a trailing number would
  * turn "سفارش Nike ۴۲" into a job called «سفارش Nike» with a quantity of 42,
@@ -70,6 +80,12 @@ import com.evergreen.trackora.ui.text.forUserContent
  *
  * Blank input is ignored rather than rejected: pressing Done on an empty field
  * is a user changing their mind, not an error worth a message.
+ *
+ * ### Look
+ *
+ * Both fields share one card, so they read as one sentence — what, and how
+ * many — rather than two forms. The card's edge turns indigo while either
+ * field has focus, and the add button fills in once there is something to add.
  */
 @Composable
 fun QuickAddField(
@@ -79,6 +95,8 @@ fun QuickAddField(
     var text by rememberSaveable { mutableStateOf("") }
     var quantity by rememberSaveable { mutableStateOf("") }
     val focusRequester = remember { FocusRequester() }
+    var titleFocused by remember { mutableStateOf(false) }
+    var quantityFocused by remember { mutableStateOf(false) }
 
     fun commit() {
         val trimmed = text.trim()
@@ -92,92 +110,114 @@ fun QuickAddField(
     }
 
     val stacked = isLargeTextScale()
+    val borderColor by animateColorAsState(
+        targetValue = if (titleFocused || quantityFocused) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.outlineVariant
+        },
+        animationSpec = tween(TrackoraMotion.SHORT),
+        label = "quickAddBorder"
+    )
 
-    // Side by side the quantity field is fixed-width, and a fixed width with
-    // scaled text clips: at 1.5x «تعداد» broke across two lines inside a 76dp
-    // box. Stacking gives it the full width instead of shrinking the type.
-    CaptureLayout(
-        stacked = stacked,
-        modifier = modifier.fillMaxWidth()
-    ) { titleModifier, quantityModifier ->
-    OutlinedTextField(
-        value = text,
-        onValueChange = { text = it },
-        modifier = titleModifier.focusRequester(focusRequester),
-        placeholder = { Text(stringResource(id = R.string.today_quick_add_hint)) },
-        singleLine = true,
-        // User content: the title may be Persian, Latin or both, so it resolves
-        // its own direction rather than inheriting the layout's.
-        textStyle = LocalTextStyle.current.forUserContent(),
-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-        keyboardActions = KeyboardActions(onDone = { commit() }),
-        trailingIcon = {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.cardContainer,
+        border = BorderStroke(1.dp, borderColor)
+    ) {
+        val title: @Composable (Modifier) -> Unit = { fieldModifier ->
+            TextField(
+                value = text,
+                onValueChange = { text = it },
+                modifier = fieldModifier
+                    .focusRequester(focusRequester)
+                    .onFocusChanged { titleFocused = it.isFocused },
+                placeholder = { Text(stringResource(id = R.string.today_quick_add_hint)) },
+                singleLine = true,
+                // User content: the title may be Persian, Latin or both, so it
+                // resolves its own direction rather than inheriting the layout's.
+                textStyle = LocalTextStyle.current.forUserContent(),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { commit() }),
+                colors = borderlessFieldColors()
+            )
+        }
+        val count: @Composable (Modifier) -> Unit = { fieldModifier ->
+            TextField(
+                value = quantity,
+                // Digit-only, so a stray letter cannot make the field unparseable.
+                // isDigit is Unicode-aware, which is what lets Persian digits through.
+                onValueChange = { input -> quantity = input.filter { it.isDigit() }.take(6) },
+                modifier = fieldModifier.onFocusChanged { quantityFocused = it.isFocused },
+                placeholder = { Text(stringResource(id = R.string.today_quick_add_qty)) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Number,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(onDone = { commit() }),
+                colors = borderlessFieldColors()
+            )
+        }
+        val add: @Composable () -> Unit = {
             // A visible commit affordance as well as the IME action: the Done
             // key is discoverable only once you have already found it.
-            IconButton(
+            FilledIconButton(
                 onClick = ::commit,
-                enabled = text.isNotBlank()
+                enabled = text.isNotBlank(),
+                modifier = Modifier.padding(end = 6.dp),
+                colors = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             ) {
                 Icon(
-                    imageVector = Icons.Default.Add,
+                    imageVector = TrackoraIcons.Add,
                     contentDescription = stringResource(id = R.string.today_quick_add_action)
                 )
             }
-        },
-        shape = MaterialTheme.shapes.medium,
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = MaterialTheme.colorScheme.primary,
-            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
-        )
-    )
+        }
 
-        OutlinedTextField(
-            value = quantity,
-            // Digit-only, so a stray letter cannot make the field unparseable.
-            // isDigit is Unicode-aware, which is what lets Persian digits through.
-            onValueChange = { input -> quantity = input.filter { it.isDigit() }.take(6) },
-            modifier = quantityModifier,
-            placeholder = { Text(stringResource(id = R.string.today_quick_add_qty)) },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Number,
-                imeAction = ImeAction.Done
-            ),
-            keyboardActions = KeyboardActions(onDone = { commit() }),
-            shape = MaterialTheme.shapes.medium,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
-            )
-        )
+        // Side by side the quantity field is a fixed width, and a fixed width
+        // with scaled text clips: at 1.5x «تعداد» broke across two lines inside
+        // it. At large text the title takes the whole first line instead and
+        // quantity and the button share the second.
+        if (stacked) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                title(Modifier.fillMaxWidth())
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    count(Modifier.weight(1f))
+                    add()
+                }
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Start
+            ) {
+                title(Modifier.weight(1f))
+                VerticalDivider(
+                    modifier = Modifier.height(28.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
+                count(Modifier.width(84.dp))
+                add()
+            }
+        }
     }
 }
 
-/**
- * Lays the capture fields out in a row, or stacked when text is large.
- *
- * Extracted so the branch is stated once and both children read the same
- * `stacked` flag, rather than each guessing at the layout it is inside.
- */
+/** Fields with no fill and no underline: the card around them is the field. */
 @Composable
-private fun CaptureLayout(
-    stacked: Boolean,
-    modifier: Modifier = Modifier,
-    content: @Composable (titleModifier: Modifier, quantityModifier: Modifier) -> Unit,
-) {
-    if (stacked) {
-        Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            content(Modifier.fillMaxWidth(), Modifier.fillMaxWidth())
-        }
-    } else {
-        Row(
-            modifier = modifier,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // weight only exists inside RowScope, which is why the modifiers
-            // are handed to the children rather than chosen by them.
-            content(Modifier.weight(1f), Modifier.width(76.dp))
-        }
-    }
-}
+private fun borderlessFieldColors() = TextFieldDefaults.colors(
+    focusedContainerColor = Color.Transparent,
+    unfocusedContainerColor = Color.Transparent,
+    disabledContainerColor = Color.Transparent,
+    focusedIndicatorColor = Color.Transparent,
+    unfocusedIndicatorColor = Color.Transparent,
+    disabledIndicatorColor = Color.Transparent,
+)
