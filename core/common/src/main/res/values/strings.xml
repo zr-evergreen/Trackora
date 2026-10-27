@@ -46,4 +46,7 @@
     <string name="work_qty_label">Qty: %1$d</string>
     <string name="action_mark_complete">Completed</string>
     <string name="action_mark_delivered">Delivered</string>
+    <!-- Read by screen readers on a row's action button: what it does, then
+         which entry it does it to, joined the way this language joins them. -->
+    <string name="action_for_entry">%1$s, %2$s</string>
 </resources>

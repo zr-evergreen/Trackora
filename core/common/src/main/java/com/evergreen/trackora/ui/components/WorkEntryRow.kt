@@ -1,57 +1,54 @@
 package com.evergreen.trackora.ui.components
 
-import androidx.compose.foundation.clickable
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.evergreen.trackora.common.R
-import com.evergreen.trackora.domain.model.Status
 import com.evergreen.trackora.domain.model.WorkEntry
 import com.evergreen.trackora.ui.text.forUserContent
 import com.evergreen.trackora.ui.text.localizedDate
+import com.evergreen.trackora.ui.theme.TrackoraIcons
+import com.evergreen.trackora.ui.theme.TrackoraMotion
+import com.evergreen.trackora.ui.theme.cardContainer
 
 /**
  * The one way a work entry is drawn in a list.
  *
- * Today and All Work previously had separate row implementations of the same
- * concept, and they had drifted apart in every respect that matters: different
- * card padding and elevation, different title weight and line limit, different
- * status rendering — All Work still used a pill built from three hardcoded
- * Material 2 hexes — and only one of them showed a date. A user moving between
- * the two tabs was looking at two designs for one thing.
+ * A sheet of paper on the page: the card is the raised container colour with
+ * a hairline edge, because a white card on the warm background is otherwise
+ * barely distinguishable from it. The title owns its line and wraps to two;
+ * a one-line preview of the description follows when there is one, since that
+ * is usually what distinguishes two jobs with the same name.
  *
- * ### Layout rule
+ * Everything else sits beneath in a [FlowRow] that wraps rather than squeezes
+ * — status, quantity, date, then the one forward action pushed to the end.
+ * There is only ever one forward move in the lifecycle, so the row offers one
+ * button rather than asking the user to re-pick the state they are looking at.
  *
- * The title owns its line. Everything else sits below it in a [FlowRow] that
- * wraps rather than squeezes: status, quantity, date, and at most one action.
- * The previous All Work row put title, quantity and status on one line with
- * `SpaceBetween`, which is why a 320dp screen truncated the title to a few
- * characters and a 1.5x font scale blew the card open with a void in it.
- *
- * ### One action, not three
- *
- * There is only ever one forward move in the lifecycle — in progress becomes
- * completed, completed becomes delivered, delivered is done — so the row offers
- * one button rather than asking the user to re-pick the state they are already
- * looking at.
+ * The descriptive parts are one accessibility node; the action stays its own,
+ * so a screen reader stops once per entry and once for its button.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -61,109 +58,135 @@ fun WorkEntryRow(
     onClick: (() -> Unit)? = null,
     onAdvanceStatus: (() -> Unit)? = null,
     /**
-     * Whether to show the entry's own date.
-     *
-     * True on history-style lists, where entries span months and a row without
-     * a date is unplaceable. False on Today, where every row is by definition
-     * today and repeating the date on each one is noise.
+     * Whether to show the entry's own date: true where entries span days and
+     * a row without one cannot be placed, false where the heading already
+     * says which day it is.
      */
     showDate: Boolean = false,
     /**
-     * Whether this row offers its forward action.
-     *
-     * Today passes false for completed work, because that work already sits in
-     * the undelivered band above with a Deliver button, and the same action
-     * twice on one screen makes the band look decorative.
+     * Whether this row offers its forward action. Today passes false for
+     * completed work, because that work already sits in the waiting band above
+     * with a Delivered button, and the same action twice on one screen makes
+     * the band look decorative.
      */
     showAction: Boolean = true,
 ) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp)
-            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
+    val content: @Composable () -> Unit = {
         Column(
             modifier = Modifier
-                .padding(horizontal = 14.dp, vertical = 12.dp)
-                // Title, status, quantity and date describe one thing, so a
-                // screen reader should announce them as one stop rather than
-                // making the user swipe through four fragments per row.
+                .padding(start = 16.dp, end = 12.dp, top = 14.dp, bottom = 12.dp)
                 .semantics(mergeDescendants = true) {}
         ) {
             Text(
                 text = entry.title,
-                style = MaterialTheme.typography.titleSmall.forUserContent(),
+                style = MaterialTheme.typography.titleMedium.forUserContent(),
                 fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            FlowRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp),
+                    .padding(end = 4.dp)
+            )
+
+            entry.description?.takeIf { it.isNotBlank() }?.let { description ->
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall.forUserContent(),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 2.dp, end = 4.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                StatusBadge(status = entry.status)
+                StatusBadge(
+                    status = entry.status,
+                    modifier = Modifier.align(Alignment.CenterVertically)
+                )
 
                 entry.quantity?.let { quantity ->
-                    RowMeta(
+                    MetaLabel(
+                        icon = TrackoraIcons.Quantity,
                         text = stringResource(id = R.string.work_qty_label, quantity),
                         modifier = Modifier.align(Alignment.CenterVertically)
                     )
                 }
 
                 if (showDate) {
-                    RowMeta(
+                    MetaLabel(
+                        icon = TrackoraIcons.Calendar,
                         text = localizedDate(entry.date),
                         modifier = Modifier.align(Alignment.CenterVertically)
                     )
                 }
 
-                val action = onAdvanceStatus
-                if (action != null && showAction) {
-                    nextActionLabel(entry.status)?.let { labelRes ->
-                        val label = stringResource(id = labelRes)
-                        TextButton(
-                            onClick = action,
-                            modifier = Modifier
-                                // Keeps the tap target at the 48dp minimum even
-                                // when the Persian label is short.
-                                .widthIn(min = 88.dp)
-                                // Names the entry, so the control still says
-                                // what it acts on when read out of context.
-                                .semantics {
-                                    contentDescription = "$label، ${entry.title}"
-                                }
-                        ) {
-                            Text(text = label)
-                        }
-                    }
+                if (onAdvanceStatus != null && showAction && nextStatus(entry.status) != null) {
+                    Spacer(modifier = Modifier.weight(1f))
+                    StatusActionButton(
+                        currentStatus = entry.status,
+                        entryTitle = entry.title,
+                        onClick = onAdvanceStatus,
+                        modifier = Modifier.align(Alignment.CenterVertically)
+                    )
                 }
             }
         }
     }
+
+    val cardModifier = modifier
+        .fillMaxWidth()
+        // A row that loses its button once delivered, or gains a line when
+        // its description changes, settles into its new height rather than
+        // jumping.
+        .animateContentSize(animationSpec = tween(TrackoraMotion.MEDIUM, easing = TrackoraMotion.Standard))
+    val shape = MaterialTheme.shapes.medium
+    val color = MaterialTheme.colorScheme.cardContainer
+    val border = cardBorder()
+
+    if (onClick != null) {
+        Surface(onClick = onClick, modifier = cardModifier, shape = shape, color = color, border = border) {
+            content()
+        }
+    } else {
+        Surface(modifier = cardModifier, shape = shape, color = color, border = border) {
+            content()
+        }
+    }
 }
 
-/** Secondary text inside the meta row, so quantity and date always match. */
+/** Secondary detail beside the status: a small icon and its text. */
 @Composable
-private fun RowMeta(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = modifier
-    )
-}
-
-/** The single forward move available from [status], or null when it is terminal. */
-private fun nextActionLabel(status: Status): Int? = when (status) {
-    Status.IN_PROGRESS -> R.string.action_mark_complete
-    Status.COMPLETED -> R.string.action_mark_delivered
-    Status.DELIVERED -> null
+fun MetaLabel(
+    icon: ImageVector,
+    text: String,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(15.dp)
+        )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1
+        )
+    }
 }
