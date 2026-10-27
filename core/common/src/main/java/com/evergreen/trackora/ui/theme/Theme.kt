@@ -1,6 +1,7 @@
 package com.evergreen.trackora.ui.theme
 
 import android.app.Activity
+import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
@@ -127,9 +128,25 @@ fun TrackoraTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
+            val controller = WindowCompat.getInsetsController(window, view)
             @Suppress("DEPRECATION")
             window.statusBarColor = colorScheme.background.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+            controller.isAppearanceLightStatusBars = !darkTheme
+            // Every screen ends in a bar — navigation or Save — that draws its
+            // own colour behind the system navigation bar. The translucent
+            // scrim Android adds over three-button navigation turned that
+            // strip a different shade from the bar above it, so it is turned
+            // off and the buttons are tinted for the theme instead. Before 10
+            // the bar cannot be see-through, so it takes the bar colour.
+            @Suppress("DEPRECATION")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                window.isNavigationBarContrastEnforced = false
+                window.navigationBarColor = Color.Transparent.toArgb()
+                controller.isAppearanceLightNavigationBars = !darkTheme
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                window.navigationBarColor = colorScheme.surfaceContainer.toArgb()
+                controller.isAppearanceLightNavigationBars = !darkTheme
+            }
         }
     }
 
