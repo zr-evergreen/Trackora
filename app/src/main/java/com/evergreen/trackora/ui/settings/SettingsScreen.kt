@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -139,6 +140,12 @@ private fun SettingsScreenContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            // Edge to edge, adjustResize does not shrink the window for the
+            // keyboard, so the custom-field inputs were typed into while
+            // hidden under it. The full keyboard height is needed here:
+            // contentPadding is applied inside the scroll, not to the
+            // viewport, so none of it keeps the viewport clear of the keyboard.
+            .imePadding()
             .verticalScroll(scrollState)
             .padding(contentPadding)
             .padding(horizontal = 16.dp, vertical = 12.dp),

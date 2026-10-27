@@ -23,6 +23,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarToday
@@ -197,6 +199,13 @@ fun AddEditWorkScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                // The window is edge to edge, so adjustResize does not shrink
+                // it for the keyboard; without this the lower fields (the
+                // custom fields, quantity on small phones) sit under the
+                // keyboard while being typed into. Shrinking the scroll
+                // viewport lets it keep the focused field in view.
+                .consumeWindowInsets(paddingValues)
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
