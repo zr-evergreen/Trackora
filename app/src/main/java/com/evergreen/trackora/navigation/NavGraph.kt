@@ -81,9 +81,13 @@ fun NavGraph(
                 // The band shows only the oldest few; the rest live in the
                 // history, where the Completed filter and search already exist.
                 onSeeAllUndelivered = {
+                    // Once All Work has been visited from the bottom bar its
+                    // state is saved, and restoring it brings back the
+                    // arguments it was saved with — dropping the filter passed
+                    // here. Discard that saved state and open it fresh instead.
+                    navController.clearBackStack<AllWorkRoute>()
                     navController.navigate(AllWorkRoute(initialStatus = Status.COMPLETED.name)) {
                         launchSingleTop = true
-                        restoreState = true
                     }
                 },
                 // Rows on Today are now tappable. Previously the only way to

@@ -35,7 +35,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.focus.FocusRequester
@@ -81,8 +84,15 @@ fun AllWorkScreen(
     // before the field claims focus, not after.
     // Applied once per arrival, not on every recomposition, so the user can
     // still clear the filter on a screen they were sent to with one set.
+    // Saveable, because opening an entry and coming back re-enters
+    // composition, and an unguarded effect would re-apply the filter over
+    // whatever the user had chosen since.
+    var initialStatusApplied by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(initialStatus) {
-        if (initialStatus != null) viewModel.setFilter(initialStatus)
+        if (initialStatus != null && !initialStatusApplied) {
+            viewModel.setFilter(initialStatus)
+            initialStatusApplied = true
+        }
     }
 
     val initialFocus = remember { FocusRequester() }
