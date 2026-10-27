@@ -14,6 +14,10 @@
     <string name="search_clear">پاک کردن جستجو</string>
     <string name="search_no_results_title">کاری پیدا نشد</string>
     <string name="search_no_results_body">واژه دیگری را امتحان کنید یا فیلترها را بردارید.</string>
-    <string name="all_work_count">%1$d کار</string>
+    <!-- How many entries the current search and filter leave, under the title. -->
+    <plurals name="all_work_count">
+        <item quantity="one">%1$d کار</item>
+        <item quantity="other">%1$d کار</item>
+    </plurals>
 </resources>
 
