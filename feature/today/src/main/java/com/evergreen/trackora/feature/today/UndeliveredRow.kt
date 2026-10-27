@@ -14,6 +14,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -129,7 +131,12 @@ private fun UndeliveredDetails(entry: WorkEntry, modifier: Modifier = Modifier) 
     }
 }
 
-/** The last strip of the band: everything waiting, in the history. */
+/**
+ * The last strip of the band: everything waiting, in the history.
+ *
+ * Announced as a button, as the text button it replaced was: a clickable
+ * surface has no role of its own.
+ */
 @Composable
 fun SeeAllWaitingRow(
     count: Int,
@@ -139,7 +146,9 @@ fun SeeAllWaitingRow(
 ) {
     Surface(
         onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .semantics { role = Role.Button },
         shape = shape,
         color = MaterialTheme.colorScheme.cardContainer,
         border = cardBorder()
