@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        The splash screen in dark mode: the app's ink background, the mark in
+        the dark theme's text colour, and the icon's own saffron for the thread.
+    -->
+    <color name="splash_background">#131317</color>
+    <color name="splash_mark">#E5E1E6</color>
+    <color name="splash_thread">#FFB866</color>
+</resources>

@@ -14,4 +14,15 @@
     <color name="trackora_primary_dark_theme">#B9C3FF</color>
     <color name="trackora_accent_dark_theme">#7FD6D0</color>
     <color name="trackora_background_dark_theme">#131317</color>
+
+    <!--
+        The splash screen: the app's own background, so the splash hands over
+        to the first screen without a change of colour, and the mark in ink
+        indigo with a saffron thread. The thread is a deeper saffron than the
+        icon's, which is drawn for indigo and would wash out on paper. The
+        night values are in values-night/colors.xml.
+    -->
+    <color name="splash_background">#FAF8F5</color>
+    <color name="splash_mark">#2B4ACB</color>
+    <color name="splash_thread">#F0961C</color>
 </resources>

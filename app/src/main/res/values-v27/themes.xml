@@ -8,4 +8,8 @@
         <!-- Light navigation bar to match the light background. -->
         <item name="android:windowLightNavigationBar">true</item>
     </style>
+
+    <style name="Theme.Trackora.Starting" parent="Base.Theme.Trackora.Starting">
+        <item name="android:windowLightNavigationBar">@bool/splash_light_system_bars</item>
+    </style>
 </resources>
