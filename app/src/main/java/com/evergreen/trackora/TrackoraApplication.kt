@@ -5,6 +5,7 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import androidx.work.WorkManager
 import com.evergreen.trackora.notification.NotificationHelper
+import com.evergreen.trackora.theme.ThemeManager
 import com.evergreen.trackora.worker.WorkManagerInitializer
 import dagger.hilt.android.HiltAndroidApp
 import dagger.hilt.android.EntryPointAccessors
@@ -19,9 +20,16 @@ class TrackoraApplication : Application() {
     
     @Inject
     lateinit var workerFactory: HiltWorkerFactory
+
+    @Inject
+    lateinit var themeManager: ThemeManager
     
     override fun onCreate() {
         super.onCreate()
+
+        // Before any activity is created, so a theme other than the phone's
+        // own is in place for the first frame; see ThemeManager.
+        themeManager.applyLaunchTheme()
         
         // Initialize WorkManager with HiltWorkerFactory
         // This must be done after super.onCreate() so Hilt injection is available

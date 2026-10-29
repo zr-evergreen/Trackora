@@ -45,6 +45,11 @@ class MainActivity : AppCompatActivity() {
         // here holds it longer.
         installSplashScreen().setOnExitAnimationListener(::leaveSplash)
         super.onCreate(savedInstanceState)
+        // The stored choices, in case they differ from what is already in
+        // place. Normally they do not: AppCompat applies the stored language
+        // and TrackoraApplication the theme before this activity is created,
+        // so neither recreates it. The first launch after an update does
+        // recreate it once, while both stores are filled.
         lifecycleScope.launch {
             localeManager.applySavedLocale()
             themeManager.applySavedTheme()
