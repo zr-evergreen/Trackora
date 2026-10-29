@@ -13,19 +13,23 @@
     <string name="reports_period_monthly">Last 30 days</string>
     <string name="reports_period_with_dates">%1$s · %2$s</string>
 
-    <!-- The headline figures. The number is drawn large on its own line, so
-         these are the words that follow it. -->
-    <plurals name="reports_jobs_finished">
-        <item quantity="one">job finished</item>
-        <item quantity="other">jobs finished</item>
-    </plurals>
-    <plurals name="reports_items_made">
-        <item quantity="one">item</item>
-        <item quantity="other">items</item>
-    </plurals>
+    <!-- The period's two figures, as tabs over the chart: what each counts, above its number. -->
+    <string name="reports_metric_jobs">Jobs finished</string>
+    <string name="reports_metric_items">Items</string>
+    <!-- How a figure moved against the period before, beside an arrow. The period is named once, below. -->
+    <string name="reports_delta_more">%1$s more</string>
+    <string name="reports_delta_fewer">%1$s fewer</string>
+    <string name="reports_delta_same">No change</string>
+    <string name="reports_compared_yesterday">Compared with yesterday</string>
+    <string name="reports_compared_week">Compared with the 7 days before</string>
+    <string name="reports_compared_month">Compared with the 30 days before</string>
+    <!-- A figure tab read aloud: "Jobs finished, 6. 5 more than the 7 days before". -->
+    <string name="reports_metric_description">%1$s, %2$s</string>
+    <string name="reports_metric_description_compared">%1$s, %2$s. %3$s</string>
 
-    <!-- Comparisons with the window before. Stated, not judged: no colour,
-         because a quiet week is information to a pieceworker, not a failure. -->
+    <!-- Comparisons with the window before, in full: what a screen reader hears
+         for each figure. Stated, not judged: no colour, because a quiet week is
+         information to a pieceworker, not a failure. -->
     <string name="reports_more_than_yesterday">%1$s more than yesterday</string>
     <string name="reports_fewer_than_yesterday">%1$s fewer than yesterday</string>
     <string name="reports_same_as_yesterday">Same as yesterday</string>
@@ -36,8 +40,6 @@
     <string name="reports_same_as_before">Same as the period before</string>
 
     <!-- The daily chart. -->
-    <string name="reports_chart_jobs">Jobs</string>
-    <string name="reports_chart_items">Items</string>
     <string name="reports_chart_jobs_title">Finished, day by day</string>
     <string name="reports_chart_items_title">Items, day by day</string>
     <string name="reports_chart_today_title">Today against yesterday</string>

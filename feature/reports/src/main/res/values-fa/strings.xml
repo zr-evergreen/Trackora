@@ -1,4 +1,4 @@
-<resources xmlns:tools="http://schemas.android.com/tools">
+<resources>
     <string name="reports_title">گزارش‌ها</string>
     <string name="reports_empty_title">هنوز چیزی ثبت نشده</string>
     <string name="reports_empty_body">کارهایی که ثبت کنید اینجا خلاصه می‌شود.</string>
@@ -11,17 +11,17 @@
     <string name="reports_period_monthly">۳۰ روز گذشته</string>
     <string name="reports_period_with_dates">%1$s، %2$s</string>
 
-    <!-- عددهای اصلی: عدد جدا و درشت نوشته می‌شود؛ این‌ها واژه‌های پس از آن‌اند.
-         The number is drawn on its own line above these labels, so the same
-         words are right for 0 and 1, which Persian's "one" covers together. -->
-    <plurals name="reports_jobs_finished" tools:ignore="ImpliedQuantity">
-        <item quantity="one">کار تمام‌شده</item>
-        <item quantity="other">کار تمام‌شده</item>
-    </plurals>
-    <plurals name="reports_items_made" tools:ignore="ImpliedQuantity">
-        <item quantity="one">عدد</item>
-        <item quantity="other">عدد</item>
-    </plurals>
+    <!-- دو عدد این بازه، به شکل زبانه‌هایی بالای نمودار. -->
+    <string name="reports_metric_jobs">کار تمام‌شده</string>
+    <string name="reports_metric_items">تعداد</string>
+    <string name="reports_delta_more">%1$s بیشتر</string>
+    <string name="reports_delta_fewer">%1$s کمتر</string>
+    <string name="reports_delta_same">بدون تغییر</string>
+    <string name="reports_compared_yesterday">در مقایسه با دیروز</string>
+    <string name="reports_compared_week">در مقایسه با ۷ روز پیش از آن</string>
+    <string name="reports_compared_month">در مقایسه با ۳۰ روز پیش از آن</string>
+    <string name="reports_metric_description">%1$s، %2$s</string>
+    <string name="reports_metric_description_compared">%1$s، %2$s. %3$s</string>
 
     <!-- مقایسه با بازهٔ قبل، بی‌قضاوت. -->
     <string name="reports_more_than_yesterday">%1$s بیشتر از دیروز</string>
@@ -34,8 +34,6 @@
     <string name="reports_same_as_before">برابر با بازهٔ قبل</string>
 
     <!-- نمودار روزانه. -->
-    <string name="reports_chart_jobs">کار</string>
-    <string name="reports_chart_items">عدد</string>
     <string name="reports_chart_jobs_title">کار تمام‌شده، روز به روز</string>
     <string name="reports_chart_items_title">عدد، روز به روز</string>
     <string name="reports_chart_today_title">امروز در برابر دیروز</string>

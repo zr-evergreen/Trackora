@@ -10,11 +10,9 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -28,7 +26,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -38,8 +35,6 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.VerticalDivider
-import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -56,12 +51,15 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.evergreen.trackora.common.R as CommonR
 import com.evergreen.trackora.domain.model.Status
 import com.evergreen.trackora.ui.components.IconTile
@@ -90,17 +88,18 @@ import kotlin.math.abs
  * Reports, told as a short story about the chosen period rather than as a
  * grid of tiles:
  *
- *  1. **How much** — jobs finished and items made, large, each with one plain
- *     sentence on how it compares with the period before.
- *  2. **When** — the same figures day by day, so a busy Tuesday and a quiet
- *     Thursday are visible instead of averaged away. Tap a bar to read it.
- *  3. **Where it stands** — of everything recorded in the period, how much is
+ *  1. **How much, and when** — jobs finished and items made, large, each with
+ *     how it moved against the period before; and beneath them, whichever is
+ *     chosen, day by day, so a busy Tuesday and a quiet Thursday are visible
+ *     instead of averaged away. Tap a bar to read it.
+ *  2. **Where it stands** — of everything recorded in the period, how much is
  *     still in progress, finished and waiting, or delivered.
- *  4. **What to do next** — work waiting to be delivered, across all dates,
+ *  3. **What to do next** — work waiting to be delivered, across all dates,
  *     and a way straight to it.
  *
  * Every figure comes from the same entries the totals are counted from, so
- * the bars always add up to the headline and nothing here is estimated.
+ * the bars always add up to the figure above them and nothing here is
+ * estimated.
  */
 
 private enum class ReportsRange { DAILY, WEEKLY, MONTHLY }
@@ -170,15 +169,8 @@ fun ReportsScreen(
         }
 
         if (summary.hasActivity) {
-            Spacer(modifier = Modifier.height(TrackoraSpacing.xxl))
-            Headline(
-                summary = summary,
-                range = range,
-                modifier = Modifier.padding(horizontal = TrackoraSpacing.screen)
-            )
-
-            Spacer(modifier = Modifier.height(TrackoraSpacing.xxl))
-            TrendCard(
+            Spacer(modifier = Modifier.height(TrackoraSpacing.lg))
+            ActivityCard(
                 summary = summary,
                 range = range,
                 measure = measure,
@@ -266,123 +258,19 @@ private fun RangeSelector(
 }
 
 /**
- * The two figures the period is about, set as type rather than boxed into
- * tiles: jobs finished first and largest, items made beside it. Under each,
- * how it compares with the period before — in words, and without colour,
- * because a quiet week is information to a pieceworker, not a failure.
+ * The period's two figures and the days behind them, in one card. The
+ * figures are tabs, and the chart beneath draws whichever one is chosen.
+ *
+ * They used to be a headline above a separate chart card with its own
+ * Jobs/Items switch. That put each number on screen twice, and the switch a
+ * card away from the figure it switched to. Now choosing a figure is choosing
+ * what the chart shows, so the two read as cause and effect.
+ *
+ * For Today a single bar would say nothing, so the chart sets it against
+ * yesterday instead — the same comparison the figures make, drawn.
  */
 @Composable
-private fun Headline(
-    summary: ReportSummary,
-    range: ReportsRange,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(IntrinsicSize.Min),
-        horizontalArrangement = Arrangement.spacedBy(TrackoraSpacing.xl)
-    ) {
-        Figure(
-            value = summary.completed,
-            label = pluralStringResource(R.plurals.reports_jobs_finished, summary.completed),
-            comparison = comparison(range, summary.changeVsPrevious),
-            style = MaterialTheme.typography.displayMedium,
-            modifier = Modifier.weight(1.1f)
-        )
-        VerticalDivider(
-            modifier = Modifier
-                .fillMaxHeight()
-                .padding(vertical = TrackoraSpacing.xs),
-            color = MaterialTheme.colorScheme.outlineVariant
-        )
-        Figure(
-            value = summary.totalQuantity,
-            label = pluralStringResource(R.plurals.reports_items_made, summary.totalQuantity),
-            comparison = comparison(range, summary.quantityChangeVsPrevious),
-            style = MaterialTheme.typography.displaySmall,
-            modifier = Modifier.weight(1f)
-        )
-    }
-}
-
-private data class Comparison(val direction: Int, val text: String)
-
-@Composable
-private fun comparison(range: ReportsRange, delta: Int?): Comparison? {
-    delta ?: return null
-    val amount = localizedNumber(abs(delta))
-    val text = when {
-        delta == 0 && range == ReportsRange.DAILY -> stringResource(R.string.reports_same_as_yesterday)
-        delta == 0 -> stringResource(R.string.reports_same_as_before)
-        delta > 0 -> stringResource(
-            when (range) {
-                ReportsRange.DAILY -> R.string.reports_more_than_yesterday
-                ReportsRange.WEEKLY -> R.string.reports_more_than_last_week
-                ReportsRange.MONTHLY -> R.string.reports_more_than_last_month
-            },
-            amount
-        )
-        else -> stringResource(
-            when (range) {
-                ReportsRange.DAILY -> R.string.reports_fewer_than_yesterday
-                ReportsRange.WEEKLY -> R.string.reports_fewer_than_last_week
-                ReportsRange.MONTHLY -> R.string.reports_fewer_than_last_month
-            },
-            amount
-        )
-    }
-    return Comparison(direction = delta.compareTo(0), text = text)
-}
-
-@Composable
-private fun Figure(
-    value: Int,
-    label: String,
-    comparison: Comparison?,
-    style: TextStyle,
-    modifier: Modifier = Modifier,
-) {
-    // One stop for a screen reader: the number, what it counts, how it moved.
-    Column(modifier = modifier.semantics(mergeDescendants = true) {}) {
-        AnimatedNumber(value = value, style = style, color = MaterialTheme.colorScheme.onSurface)
-        Text(
-            text = label,
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        if (comparison != null) {
-            Row(
-                modifier = Modifier.padding(top = TrackoraSpacing.sm),
-                horizontalArrangement = Arrangement.spacedBy(TrackoraSpacing.xs)
-            ) {
-                Icon(
-                    imageVector = when {
-                        comparison.direction > 0 -> TrackoraIcons.TrendUp
-                        comparison.direction < 0 -> TrackoraIcons.TrendDown
-                        else -> TrackoraIcons.TrendFlat
-                    },
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(16.dp)
-                )
-                Text(
-                    text = comparison.text,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
-
-/**
- * The period day by day. For Today a single bar would say nothing, so it is
- * set against yesterday instead — the same comparison the headline makes,
- * drawn.
- */
-@Composable
-private fun TrendCard(
+private fun ActivityCard(
     summary: ReportSummary,
     range: ReportsRange,
     measure: ChartMeasure,
@@ -425,115 +313,258 @@ private fun TrendCard(
         color = MaterialTheme.colorScheme.cardContainer,
         border = cardBorder()
     ) {
-        Column(modifier = Modifier.padding(TrackoraSpacing.lg)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f)
+        Column(modifier = Modifier.padding(TrackoraSpacing.md)) {
+            Row(
+                modifier = Modifier
+                    .height(IntrinsicSize.Min)
+                    .selectableGroup(),
+                horizontalArrangement = Arrangement.spacedBy(TrackoraSpacing.sm)
+            ) {
+                val jobs = stringResource(R.string.reports_metric_jobs)
+                MetricTab(
+                    label = jobs,
+                    value = summary.completed,
+                    change = summary.changeVsPrevious,
+                    description = metricDescription(jobs, summary.completed, comparison(range, summary.changeVsPrevious)),
+                    selected = measure == ChartMeasure.JOBS,
+                    onClick = { onMeasureChange(ChartMeasure.JOBS) },
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
                 )
-                MeasureToggle(selected = measure, onSelected = onMeasureChange)
+                val items = stringResource(R.string.reports_metric_items)
+                MetricTab(
+                    label = items,
+                    value = summary.totalQuantity,
+                    change = summary.quantityChangeVsPrevious,
+                    description = metricDescription(
+                        items,
+                        summary.totalQuantity,
+                        comparison(range, summary.quantityChangeVsPrevious)
+                    ),
+                    selected = measure == ChartMeasure.ITEMS,
+                    onClick = { onMeasureChange(ChartMeasure.ITEMS) },
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                )
             }
 
-            // What the chart is showing right now: the tapped day, or the
-            // average it should be read against.
-            val readout = selected?.let { index ->
-                stringResource(
-                    R.string.reports_chart_selection,
-                    localizedRelativeDate(days[index].date, today),
-                    valueText(values[index])
+            Column(modifier = Modifier.padding(horizontal = TrackoraSpacing.xs)) {
+                // What both movements are measured against, said once.
+                if (summary.changeVsPrevious != null || summary.quantityChangeVsPrevious != null) {
+                    Text(
+                        text = stringResource(comparedWith(range)),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .padding(top = TrackoraSpacing.sm)
+                            // The tabs already say it in full to a screen reader.
+                            .clearAndSetSemantics {}
+                    )
+                }
+
+                // What the chart is showing right now: the tapped day, or the
+                // average it should be read against, keyed to its dashed line.
+                val readout = selected?.let { index ->
+                    Readout(
+                        text = stringResource(
+                            R.string.reports_chart_selection,
+                            localizedRelativeDate(days[index].date, today),
+                            valueText(values[index])
+                        ),
+                        isSelection = true
+                    )
+                } ?: average?.let { Readout(stringResource(R.string.reports_chart_average, formatAverage(it))) }
+                ?: Readout(stringResource(R.string.reports_chart_hint))
+                AnimatedContent(
+                    targetState = readout,
+                    transitionSpec = { fadeIn(tween(TrackoraMotion.SHORT)) togetherWith fadeOut(tween(TrackoraMotion.SHORT)) },
+                    modifier = Modifier.padding(top = TrackoraSpacing.lg),
+                    label = "chartReadout"
+                ) { shown ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(TrackoraSpacing.sm)
+                    ) {
+                        if (!shown.isSelection && average != null) AverageLineKey()
+                        Text(
+                            text = shown.text,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = if (shown.isSelection) FontWeight.SemiBold else FontWeight.Normal,
+                            color = if (shown.isSelection) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(TrackoraSpacing.md))
+                DailyBarChart(
+                    values = values,
+                    labels = labels,
+                    emphasisIndex = days.indexOfFirst { it.date == today }.takeIf { it >= 0 },
+                    selectedIndex = selected,
+                    onSelect = { selected = it },
+                    average = average,
+                    showValues = values.size <= 7,
+                    description = description
                 )
-            } ?: average?.let { stringResource(R.string.reports_chart_average, formatAverage(it)) }
-            ?: stringResource(R.string.reports_chart_hint)
-            AnimatedContent(
-                targetState = readout,
-                transitionSpec = { fadeIn(tween(TrackoraMotion.SHORT)) togetherWith fadeOut(tween(TrackoraMotion.SHORT)) },
-                label = "chartReadout"
-            ) { text ->
-                Text(
-                    text = text,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = if (selected != null) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (selected != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                )
+
+                if (selected == null && average != null) {
+                    Text(
+                        text = stringResource(R.string.reports_chart_hint),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = TrackoraSpacing.md, bottom = TrackoraSpacing.xs)
+                    )
+                }
             }
+        }
+    }
+}
 
-            Spacer(modifier = Modifier.height(TrackoraSpacing.lg))
-            DailyBarChart(
-                values = values,
-                labels = labels,
-                emphasisIndex = days.indexOfFirst { it.date == today }.takeIf { it >= 0 },
-                selectedIndex = selected,
-                onSelect = { selected = it },
-                average = average,
-                showValues = values.size <= 7,
-                description = description
-            )
+private data class Readout(val text: String, val isSelection: Boolean = false)
 
-            if (selected == null && average != null) {
+/**
+ * One of the period's figures, as a tab over the chart: what it counts, the
+ * number, and how it moved against the period before.
+ *
+ * The movement is an arrow and a few words — "5 more" — and the period it is
+ * measured against is named once, beneath both tabs; a full sentence under
+ * each number wrapped onto two lines on a phone and said the period twice.
+ * It stays uncoloured, because a quiet week is information to a pieceworker,
+ * not a failure.
+ *
+ * The chosen tab is filled and the other outlined, so the choice never rests
+ * on colour alone. A screen reader hears it as one tab, with the full
+ * sentence from [description].
+ *
+ * @param change the difference from the period before, or null when there
+ *   is nothing to compare.
+ */
+@Composable
+internal fun MetricTab(
+    label: String,
+    value: Int,
+    change: Int?,
+    description: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val fill by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+        animationSpec = tween(TrackoraMotion.SHORT),
+        label = "metricFill"
+    )
+    val edge by animateColorAsState(
+        targetValue = if (selected) Color.Transparent else MaterialTheme.colorScheme.outlineVariant,
+        animationSpec = tween(TrackoraMotion.SHORT),
+        label = "metricEdge"
+    )
+    val ink = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+    val quiet = if (selected) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val shape = MaterialTheme.shapes.medium
+
+    Column(
+        modifier = modifier
+            .clip(shape)
+            .background(fill)
+            .border(1.dp, edge, shape)
+            .selectable(selected = selected, role = Role.Tab, onClick = onClick)
+            .clearAndSetSemantics { contentDescription = description }
+            .padding(horizontal = TrackoraSpacing.md, vertical = TrackoraSpacing.sm)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            color = quiet,
+            maxLines = 2
+        )
+        // Figures need none of the room Persian letters do above and below
+        // the line, so the number sits tighter than its style.
+        AnimatedNumber(
+            value = value,
+            style = MaterialTheme.typography.displaySmall.copy(lineHeight = 46.sp),
+            color = ink
+        )
+        if (change != null) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(TrackoraSpacing.xs)
+            ) {
+                Icon(
+                    imageVector = when {
+                        change > 0 -> TrackoraIcons.TrendUp
+                        change < 0 -> TrackoraIcons.TrendDown
+                        else -> TrackoraIcons.TrendFlat
+                    },
+                    contentDescription = null,
+                    tint = quiet,
+                    modifier = Modifier.size(16.dp)
+                )
                 Text(
-                    text = stringResource(R.string.reports_chart_hint),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = TrackoraSpacing.md)
+                    text = when {
+                        change > 0 -> stringResource(R.string.reports_delta_more, localizedNumber(change))
+                        change < 0 -> stringResource(R.string.reports_delta_fewer, localizedNumber(-change))
+                        else -> stringResource(R.string.reports_delta_same)
+                    },
+                    style = MaterialTheme.typography.labelMedium,
+                    color = quiet
                 )
             }
         }
     }
 }
 
-/**
- * Jobs or items: which measure the chart draws. Two compact pills, each
- * inside a full 48dp touch target that stays invisible, so the toggle sits
- * neatly beside the card's title.
- */
+/** The period the figures' movements are measured against. */
+private fun comparedWith(range: ReportsRange): Int = when (range) {
+    ReportsRange.DAILY -> R.string.reports_compared_yesterday
+    ReportsRange.WEEKLY -> R.string.reports_compared_week
+    ReportsRange.MONTHLY -> R.string.reports_compared_month
+}
+
+/** "Jobs finished, 6. 5 more than the 7 days before": a tab, read aloud. */
 @Composable
-private fun MeasureToggle(
-    selected: ChartMeasure,
-    onSelected: (ChartMeasure) -> Unit,
-) {
-    Row(
-        modifier = Modifier.selectableGroup(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        listOf(
-            ChartMeasure.JOBS to R.string.reports_chart_jobs,
-            ChartMeasure.ITEMS to R.string.reports_chart_items
-        ).forEach { (measure, label) ->
-            val isSelected = selected == measure
-            val fill by animateColorAsState(
-                targetValue = if (isSelected) {
-                    MaterialTheme.colorScheme.primaryContainer
-                } else {
-                    MaterialTheme.colorScheme.surfaceContainerHigh
-                },
-                animationSpec = tween(TrackoraMotion.SHORT),
-                label = "measureFill"
-            )
-            Box(
-                modifier = Modifier
-                    .minimumInteractiveComponentSize()
-                    .selectable(selected = isSelected, role = Role.RadioButton, onClick = { onSelected(measure) }),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = stringResource(label),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (isSelected) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                    modifier = Modifier
-                        .padding(horizontal = 2.dp)
-                        .clip(CircleShape)
-                        .background(fill)
-                        .padding(horizontal = 12.dp, vertical = 5.dp)
-                )
-            }
-        }
+private fun metricDescription(label: String, value: Int, comparison: String?): String =
+    if (comparison == null) {
+        stringResource(R.string.reports_metric_description, label, localizedNumber(value))
+    } else {
+        stringResource(R.string.reports_metric_description_compared, label, localizedNumber(value), comparison)
+    }
+
+/** How a figure compares with the period before, as a sentence, or null when there is nothing to compare. */
+@Composable
+private fun comparison(range: ReportsRange, delta: Int?): String? {
+    delta ?: return null
+    val amount = localizedNumber(abs(delta))
+    return when {
+        delta == 0 && range == ReportsRange.DAILY -> stringResource(R.string.reports_same_as_yesterday)
+        delta == 0 -> stringResource(R.string.reports_same_as_before)
+        delta > 0 -> stringResource(
+            when (range) {
+                ReportsRange.DAILY -> R.string.reports_more_than_yesterday
+                ReportsRange.WEEKLY -> R.string.reports_more_than_last_week
+                ReportsRange.MONTHLY -> R.string.reports_more_than_last_month
+            },
+            amount
+        )
+        else -> stringResource(
+            when (range) {
+                ReportsRange.DAILY -> R.string.reports_fewer_than_yesterday
+                ReportsRange.WEEKLY -> R.string.reports_fewer_than_last_week
+                ReportsRange.MONTHLY -> R.string.reports_fewer_than_last_month
+            },
+            amount
+        )
     }
 }
 
@@ -573,8 +604,11 @@ private fun formatAverage(value: Float): String {
 /**
  * How the period's recorded work stands now: still in progress, finished and
  * waiting, or delivered. The same three colours as the cards in All Work.
+ *
+ * Under the bar, a column per status with its count large, in the order of
+ * the bar's segments, so the bar is read for proportion and the columns for
+ * the number — rather than a run of inline labels that wrapped unevenly.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SplitCard(
     summary: ReportSummary,
@@ -614,16 +648,14 @@ private fun SplitCard(
                 )
             }
             SplitBar(parts = parts.map { (status, count) -> count to statusAccent(status) })
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(TrackoraSpacing.lg),
-                verticalArrangement = Arrangement.spacedBy(TrackoraSpacing.xs)
-            ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(TrackoraSpacing.sm)) {
                 parts.forEach { (status, count) ->
-                    LegendItem(
+                    StatusCount(
                         icon = TrackoraIcons.forStatus(status),
                         color = statusAccent(status),
                         label = stringResource(statusName(status)),
-                        count = count
+                        count = count,
+                        modifier = Modifier.weight(1f)
                     )
                 }
             }
@@ -632,28 +664,30 @@ private fun SplitCard(
 }
 
 @Composable
-private fun LegendItem(
+private fun StatusCount(
     icon: ImageVector,
     color: Color,
     label: String,
     count: Int,
+    modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier = Modifier.semantics(mergeDescendants = true) {},
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(TrackoraSpacing.xs)
-    ) {
-        Icon(imageVector = icon, contentDescription = null, tint = color, modifier = Modifier.size(16.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = localizedNumber(count),
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
+    Column(modifier = modifier.semantics(mergeDescendants = true) {}) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(TrackoraSpacing.xs)
+        ) {
+            Icon(imageVector = icon, contentDescription = null, tint = color, modifier = Modifier.size(15.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2
+            )
+        }
+        AnimatedNumber(
+            value = count,
+            style = MaterialTheme.typography.titleLarge,
+            color = if (count == 0) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
         )
     }
 }
