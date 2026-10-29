@@ -37,6 +37,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
@@ -51,6 +54,7 @@ import com.evergreen.trackora.ui.theme.TrackoraIcons
 import com.evergreen.trackora.ui.theme.TrackoraMotion
 import com.evergreen.trackora.ui.theme.cardContainer
 import com.evergreen.trackora.ui.theme.statusAccent
+import com.evergreen.trackora.util.PersianSearch
 
 /**
  * The one way a work entry is drawn in a list.
@@ -107,6 +111,13 @@ fun WorkEntryRow(
      * the band look decorative.
      */
     showAction: Boolean = true,
+    /**
+     * The search the list is filtered by. Its match is highlighted in the
+     * title or description, and when it matched a field the card does not
+     * otherwise show — a customer name, a job code — that field is shown,
+     * so every result says why it is there.
+     */
+    searchQuery: String = "",
 ) {
     val showButton = onAdvanceStatus != null && showAction && nextStatus(entry.status) != null
     // At large text the button and the details cannot share a line on a
@@ -137,7 +148,12 @@ fun WorkEntryRow(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                EntryDetails(entry = entry, showDate = showDate, modifier = Modifier.weight(1f))
+                EntryDetails(
+                    entry = entry,
+                    showDate = showDate,
+                    searchQuery = searchQuery,
+                    modifier = Modifier.weight(1f)
+                )
                 if (showButton && !stackButton && onAdvanceStatus != null) {
                     StatusActionButton(
                         currentStatus = entry.status,
@@ -215,12 +231,30 @@ private fun DrawScope.drawStatusMark(color: Color) {
 private fun EntryDetails(
     entry: WorkEntry,
     showDate: Boolean,
+    searchQuery: String,
     modifier: Modifier = Modifier,
 ) {
     val align = layoutStartAlign()
+    val mark = SpanStyle(
+        background = MaterialTheme.colorScheme.primaryContainer,
+        color = MaterialTheme.colorScheme.onPrimaryContainer
+    )
+    val description = entry.description?.takeIf { it.isNotBlank() }
+    // The field that explains a search result the title and description do not.
+    val otherMatch = if (
+        searchQuery.isBlank() ||
+        PersianSearch.matchRange(entry.title, searchQuery) != null ||
+        PersianSearch.matchRange(description, searchQuery) != null
+    ) {
+        null
+    } else {
+        listOfNotNull(entry.customField1, entry.customField2, entry.customField3)
+            .firstOrNull { PersianSearch.matchRange(it, searchQuery) != null }
+    }
+
     Column(modifier = modifier.semantics(mergeDescendants = true) {}) {
         Text(
-            text = entry.title,
+            text = highlighted(entry.title, searchQuery, mark),
             style = MaterialTheme.typography.titleMedium.forUserContent(),
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface,
@@ -230,9 +264,9 @@ private fun EntryDetails(
             modifier = Modifier.fillMaxWidth()
         )
 
-        entry.description?.takeIf { it.isNotBlank() }?.let { description ->
+        description?.let {
             Text(
-                text = description,
+                text = highlighted(it, searchQuery, mark),
                 style = MaterialTheme.typography.bodySmall.forUserContent(),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = align,
@@ -242,6 +276,28 @@ private fun EntryDetails(
                     .fillMaxWidth()
                     .padding(top = 2.dp)
             )
+        }
+
+        otherMatch?.let { field ->
+            Row(
+                modifier = Modifier.padding(top = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Icon(
+                    imageVector = TrackoraIcons.Search,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(14.dp)
+                )
+                Text(
+                    text = highlighted(field, searchQuery, mark),
+                    style = MaterialTheme.typography.bodySmall.forUserContent(),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(6.dp))
@@ -270,9 +326,47 @@ private fun EntryDetails(
                     modifier = Modifier.align(Alignment.CenterVertically)
                 )
             }
+
+            if (entry.photoUri != null) {
+                Icon(
+                    imageVector = TrackoraIcons.Photo,
+                    contentDescription = stringResource(id = R.string.work_has_photo),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .align(Alignment.CenterVertically)
+                        .size(15.dp)
+                )
+            }
         }
     }
 }
+
+/**
+ * [text] with the part matching [query] marked in [style], found the way the
+ * list search finds it — Arabic or Persian letterforms, half-spaces and
+ * digits folded — so the mark lands on the stored text the user sees.
+ *
+ * A match far into a long one-line field is brought into view: the text is
+ * cut to start a few words before it, behind an ellipsis.
+ */
+private fun highlighted(text: String, query: String, style: SpanStyle): AnnotatedString {
+    val range = PersianSearch.matchRange(text, query) ?: return AnnotatedString(text)
+    val cut = if (range.first > SNIPPET_LEAD * 2) {
+        val from = text.lastIndexOf(' ', range.first - SNIPPET_LEAD).let { if (it < 0) range.first - SNIPPET_LEAD else it + 1 }
+        from.coerceIn(0, range.first)
+    } else {
+        0
+    }
+    return buildAnnotatedString {
+        if (cut > 0) append("…")
+        val offset = length - cut
+        append(text.substring(cut))
+        addStyle(style, range.first + offset, range.last + 1 + offset)
+    }
+}
+
+/** Characters of context kept before a match brought into view. */
+private const val SNIPPET_LEAD = 12
 
 /** Secondary detail beside the status: a small icon and its text. */
 @Composable

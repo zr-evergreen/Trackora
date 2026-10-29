@@ -51,4 +51,6 @@
     <!-- Read by screen readers on a row's action button: what it does, then
          which entry it does it to, joined the way this language joins them. -->
     <string name="action_for_entry">%1$s, %2$s</string>
+    <!-- Read with an entry card that has a photo, in place of its small photo icon. -->
+    <string name="work_has_photo">Photo attached</string>
 </resources>
