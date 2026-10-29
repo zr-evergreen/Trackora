@@ -29,30 +29,83 @@ data class AllWorkUiState(
             .filter { it.matches(query) }
 
     /**
-     * The filtered list grouped into days, newest first.
-     *
-     * History reads as days, not as an undifferentiated stream. Grouping also
-     * removes the repetition of printing the same date on every row of a busy
-     * day — with a header the row only needs to say what makes it different.
+     * How many entries match the search, per status: what each status filter
+     * would show if chosen, so the filters say what is behind them before
+     * they are tapped. Statuses with nothing are absent.
      */
-    val sections: List<DaySection>
-        get() = filteredEntries
-            .groupBy { it.date }
-            .toSortedMap(compareByDescending { it })
-            .map { (date, entries) -> DaySection(date = date, entries = entries) }
+    val countsByStatus: Map<Status, Int>
+        get() = entries.filter { it.matches(query) }.groupingBy { it.status }.eachCount()
+
+    /** How many entries match the search whatever their status: what "All" would show. */
+    val matchingCount: Int
+        get() = entries.count { it.matches(query) }
+
+    /**
+     * The filtered list as the screen lays it out, newest first.
+     *
+     * History reads as days, not as an undifferentiated stream — but only
+     * while the days are recent enough to be remembered as days. The last
+     * [RECENT_DAYS] each get their own section; anything older is gathered
+     * by calendar month, where a heading for every quiet Tuesday of last
+     * spring would otherwise be most of what was on screen.
+     *
+     * @param monthKeyOf names the month a date falls in, in the calendar the
+     *   user reads — Jalali months for Persian, whose boundaries fall mid-way
+     *   through Gregorian ones.
+     */
+    fun sections(today: LocalDate, monthKeyOf: (LocalDate) -> Int): List<WorkSection> {
+        val firstRecentDay = today.minusDays(RECENT_DAYS - 1L)
+        val (recent, older) = filteredEntries
+            .sortedByDescending { it.date }
+            .partition { !it.date.isBefore(firstRecentDay) }
+        val days = recent.groupBy { it.date }
+            .map { (date, entries) -> WorkSection.Day(date = date, entries = entries) }
+        val months = older.groupBy { monthKeyOf(it.date) }
+            .map { (key, entries) -> WorkSection.Month(monthKey = key, latest = entries.first().date, entries = entries) }
+        return days + months
+    }
 
     val isSearching: Boolean
         get() = query.isNotBlank()
 
+    /** Whether a status filter or a search is narrowing the list. */
+    val isNarrowed: Boolean
+        get() = filter != null || isSearching
+
     /** True when a filter or search is hiding everything, as opposed to an empty log. */
     val hasNoMatches: Boolean
         get() = entries.isNotEmpty() && filteredEntries.isEmpty()
+
+    companion object {
+        /** Days, counting today, that keep a section of their own. */
+        const val RECENT_DAYS = 7
+    }
 }
 
-data class DaySection(
-    val date: LocalDate,
+/** A run of entries under one heading on All Work. */
+sealed interface WorkSection {
     val entries: List<WorkEntry>
-)
+
+    /** Stable across recompositions, for the list's keys. */
+    val key: String
+
+    /** Items across the section's entries, for its heading. */
+    val items: Int
+        get() = entries.sumOf { it.quantity ?: 0 }
+
+    /** One recent day. */
+    data class Day(val date: LocalDate, override val entries: List<WorkEntry>) : WorkSection {
+        override val key: String get() = "day-$date"
+    }
+
+    /**
+     * One older calendar month. [latest] is its most recent date, which the
+     * heading names the month by.
+     */
+    data class Month(val monthKey: Int, val latest: LocalDate, override val entries: List<WorkEntry>) : WorkSection {
+        override val key: String get() = "month-$monthKey"
+    }
+}
 
 /**
  * Whether this entry matches a search [query].

@@ -19,5 +19,18 @@
         <item quantity="one">%1$d entry</item>
         <item quantity="other">%1$d entries</item>
     </plurals>
+    <!-- Under the title when a filter or search narrows the list. -->
+    <plurals name="all_work_count_of">
+        <item quantity="one">%1$d of %2$d entry</item>
+        <item quantity="other">%1$d of %2$d entries</item>
+    </plurals>
+    <!-- Units recorded, the same word Today uses for them. -->
+    <plurals name="all_work_items">
+        <item quantity="one">%1$d item</item>
+        <item quantity="other">%1$d items</item>
+    </plurals>
+    <!-- Joins a count of entries and a count of items: "11 entries · 46 items". -->
+    <string name="all_work_summary">%1$s · %2$s</string>
+    <!-- Clears the search and the status filter when they hide everything. -->
+    <string name="all_work_show_all">Show all work</string>
 </resources>
-
