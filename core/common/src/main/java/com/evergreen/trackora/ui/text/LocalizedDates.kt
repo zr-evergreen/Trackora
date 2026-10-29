@@ -92,3 +92,94 @@ fun localizedRelativeDate(date: LocalDate, today: LocalDate): String {
         else -> localizedDate(date)
     }
 }
+
+/**
+ * A span of days, written once rather than as two full dates: "Oct 21 – 27,
+ * 2026", or «۲۹ مهر – ۵ آبان ۱۴۰۵» in the Jalali calendar. The month and year
+ * are only repeated where the span crosses them.
+ */
+@Composable
+@ReadOnlyComposable
+fun localizedDateRange(start: LocalDate, end: LocalDate): String {
+    if (start == end) return localizedDate(end)
+    val locale = LocalConfiguration.current.locales[0]
+
+    return if (locale.language == "fa") {
+        val from = JalaliCalendar.gregorianToJalali(start)
+        val to = JalaliCalendar.gregorianToJalali(end)
+        fun day(value: Int) = PersianDigits.toPersian(value.toString())
+        val toPart = "${day(to.day)} ${JalaliCalendar.getJalaliMonthName(to.month)} ${day(to.year)}"
+        val fromPart = when {
+            from.year != to.year ->
+                "${day(from.day)} ${JalaliCalendar.getJalaliMonthName(from.month)} ${day(from.year)}"
+            from.month != to.month -> "${day(from.day)} ${JalaliCalendar.getJalaliMonthName(from.month)}"
+            else -> day(from.day)
+        }
+        "$fromPart – $toPart"
+    } else {
+        val fromPattern = when {
+            start.year != end.year -> "MMM d, yyyy"
+            else -> "MMM d"
+        }
+        val toPattern = if (start.month == end.month && start.year == end.year) "d, yyyy" else "MMM d, yyyy"
+        "${start.format(DateTimeFormatter.ofPattern(fromPattern, locale))} – " +
+            end.format(DateTimeFormatter.ofPattern(toPattern, locale))
+    }
+}
+
+/**
+ * The shortest recognisable name of [date]'s weekday, for chart axes: "Mon",
+ * or the Persian single-letter form — ش ی د س چ پ ج — that Iranian calendars
+ * print above their columns.
+ */
+@Composable
+@ReadOnlyComposable
+fun localizedWeekdayShort(date: LocalDate): String {
+    val locale = LocalConfiguration.current.locales[0]
+    return if (locale.language == "fa") {
+        PERSIAN_WEEKDAY_INITIALS[JalaliCalendar.persianWeekdayIndex(date)]
+    } else {
+        date.format(DateTimeFormatter.ofPattern("EEE", locale))
+    }
+}
+
+/** [date]'s day of the month in the locale's calendar and digits: "27", or «۵» for ۵ آبان. */
+@Composable
+@ReadOnlyComposable
+fun localizedDayOfMonth(date: LocalDate): String {
+    val locale = LocalConfiguration.current.locales[0]
+    return if (locale.language == "fa") {
+        PersianDigits.toPersian(JalaliCalendar.gregorianToJalali(date).day.toString())
+    } else {
+        date.dayOfMonth.toString()
+    }
+}
+
+/** The month [date] falls in, with its year: "October 2026", or «آبان ۱۴۰۵». */
+@Composable
+@ReadOnlyComposable
+fun localizedMonthTitle(date: LocalDate): String {
+    val locale = LocalConfiguration.current.locales[0]
+    return if (locale.language == "fa") {
+        val jalali = JalaliCalendar.gregorianToJalali(date)
+        "${JalaliCalendar.getJalaliMonthName(jalali.month)} ${PersianDigits.toPersian(jalali.year.toString())}"
+    } else {
+        date.format(DateTimeFormatter.ofPattern("LLLL yyyy", locale))
+    }
+}
+
+/**
+ * Identifies the calendar month [date] falls in, in the calendar the user
+ * reads: Jalali months for Persian, Gregorian otherwise. Two dates share a
+ * month exactly when their keys are equal. ۵ آبان and ۲۹ مهر are different
+ * months even though both fall in October.
+ */
+fun calendarMonthKey(date: LocalDate, jalali: Boolean): Int =
+    if (jalali) {
+        val jalaliDate = JalaliCalendar.gregorianToJalali(date)
+        jalaliDate.year * 12 + jalaliDate.month - 1
+    } else {
+        date.year * 12 + date.monthValue - 1
+    }
+
+private val PERSIAN_WEEKDAY_INITIALS = arrayOf("ش", "ی", "د", "س", "چ", "پ", "ج")

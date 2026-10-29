@@ -13,7 +13,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -30,7 +29,7 @@ class ReportsViewModel @Inject constructor(
 
     private val today: LocalDate = LocalDate.now()
 
-    private val _uiState = MutableStateFlow(ReportsUiState())
+    private val _uiState = MutableStateFlow(ReportsUiState(today = today))
     val uiState: StateFlow<ReportsUiState> = _uiState.asStateFlow()
 
     init {
@@ -60,6 +59,8 @@ class ReportsViewModel @Inject constructor(
                     weekly = weekly,
                     monthly = monthly,
                     undeliveredCount = undelivered.size,
+                    oldestWaiting = undelivered.minOfOrNull { it.date },
+                    today = today,
                     isLoading = false
                 )
             }
@@ -85,7 +86,10 @@ class ReportsViewModel @Inject constructor(
         getWorkEntriesByDateRangeUseCase(prevStart, prevEnd)
     ) { current, previous ->
         toSummary(current).copy(
-            previousCompleted = previous.count { it.status != Status.IN_PROGRESS }
+            previousCompleted = previous.count { it.isFinished },
+            previousQuantity = previous.sumOf { it.quantity ?: 0 },
+            days = daysOf(current, start, end),
+            previousDays = daysOf(previous, prevStart, prevEnd)
         )
     }
 
@@ -96,8 +100,33 @@ class ReportsViewModel @Inject constructor(
      */
     private fun toSummary(entries: List<WorkEntry>): ReportSummary {
         return ReportSummary(
-            completed = entries.count { it.status != Status.IN_PROGRESS },
-            totalQuantity = entries.sumOf { it.quantity ?: 0 }
+            completed = entries.count { it.isFinished },
+            totalQuantity = entries.sumOf { it.quantity ?: 0 },
+            inProgress = entries.count { it.status == Status.IN_PROGRESS },
+            waiting = entries.count { it.status == Status.COMPLETED },
+            delivered = entries.count { it.status == Status.DELIVERED }
         )
     }
+
+    /**
+     * One [DayFigures] per day from [start] to [end], by the same definitions
+     * as the window totals, so the bars always add up to the headline figure.
+     */
+    private fun daysOf(entries: List<WorkEntry>, start: LocalDate, end: LocalDate): List<DayFigures> {
+        val byDate = entries.groupBy { it.date }
+        return generateSequence(start) { it.plusDays(1) }
+            .takeWhile { !it.isAfter(end) }
+            .map { date ->
+                val onDay = byDate[date].orEmpty()
+                DayFigures(
+                    date = date,
+                    finished = onDay.count { it.isFinished },
+                    units = onDay.sumOf { it.quantity ?: 0 }
+                )
+            }
+            .toList()
+    }
+
+    private val WorkEntry.isFinished: Boolean
+        get() = status != Status.IN_PROGRESS
 }

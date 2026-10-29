@@ -6,6 +6,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
@@ -170,5 +171,48 @@ class WorkEntryRowTest {
     private companion object {
         const val TITLE = "Hem trousers"
         const val PERSIAN_TITLE = "کت‌شلوار"
+        const val CUSTOMER = "Karimi J-104"
+    }
+
+    // --- Search ---------------------------------------------------------------
+
+    @Test
+    fun aSearchMatchIsMarkedInTheTitle() {
+        composeRule.setContent {
+            TrackoraTheme(darkTheme = false) {
+                WorkEntryRow(entry = entry(Status.IN_PROGRESS), searchQuery = "TROUS")
+            }
+        }
+
+        val title = composeRule.onNodeWithText(TITLE, useUnmergedTree = true)
+            .fetchSemanticsNode().config[SemanticsProperties.Text].first()
+        val mark = title.spanStyles.single()
+        // "Hem trousers": the match is the original characters 4 to 9.
+        assertEquals(4, mark.start)
+        assertEquals(9, mark.end)
+    }
+
+    @Test
+    fun aMatchInACustomerFieldIsShownOnTheCard() {
+        val withCustomer = entry(Status.DELIVERED).copy(customField1 = CUSTOMER)
+        composeRule.setContent {
+            TrackoraTheme(darkTheme = false) {
+                WorkEntryRow(entry = withCustomer, searchQuery = "j-104")
+            }
+        }
+
+        composeRule.onNodeWithText(CUSTOMER, useUnmergedTree = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun withoutASearchTheCardDoesNotShowItsCustomFields() {
+        val withCustomer = entry(Status.DELIVERED).copy(customField1 = CUSTOMER)
+        composeRule.setContent {
+            TrackoraTheme(darkTheme = false) {
+                WorkEntryRow(entry = withCustomer)
+            }
+        }
+
+        composeRule.onAllNodesWithText(CUSTOMER, useUnmergedTree = true).assertCountEquals(0)
     }
 }

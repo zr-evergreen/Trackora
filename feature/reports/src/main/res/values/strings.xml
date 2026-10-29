@@ -1,18 +1,72 @@
 <resources>
     <string name="reports_title">Reports</string>
-    <string name="reports_daily">Daily</string>
-    <string name="reports_weekly">Weekly</string>
-    <string name="reports_monthly">Monthly</string>
-    <string name="reports_completed">Completed</string>
-    <string name="reports_delivered">Delivered</string>
-    <string name="reports_quantity">Total quantity</string>
-    <string name="reports_awaiting_delivery">Still waiting to be delivered</string>
-    <string name="reports_delta_up">%1$s more than the period before</string>
-    <string name="reports_delta_down">%1$s fewer than the period before</string>
     <string name="reports_empty_title">Nothing recorded yet</string>
     <string name="reports_empty_body">Work you record will be summarised here.</string>
-    <!-- What the selected window covers, under the title. -->
-    <string name="reports_period_daily">Today</string>
+
+    <!-- The period selector. Spans rather than "daily/weekly/monthly": the
+         windows are rolling, and "weekly" invites the question "which week?". -->
+    <string name="reports_range_today">Today</string>
+    <string name="reports_range_week">7 days</string>
+    <string name="reports_range_month">30 days</string>
+    <!-- What the selected window covers, under the title, before its dates. -->
     <string name="reports_period_weekly">Last 7 days</string>
     <string name="reports_period_monthly">Last 30 days</string>
+    <string name="reports_period_with_dates">%1$s · %2$s</string>
+
+    <!-- The period's two figures, as tabs over the chart: what each counts, above its number. -->
+    <string name="reports_metric_jobs">Jobs finished</string>
+    <string name="reports_metric_items">Items</string>
+    <!-- How a figure moved against the period before, beside an arrow. The period is named once, below. -->
+    <string name="reports_delta_more">%1$s more</string>
+    <string name="reports_delta_fewer">%1$s fewer</string>
+    <string name="reports_delta_same">No change</string>
+    <string name="reports_compared_yesterday">Compared with yesterday</string>
+    <string name="reports_compared_week">Compared with the 7 days before</string>
+    <string name="reports_compared_month">Compared with the 30 days before</string>
+    <!-- A figure tab read aloud: "Jobs finished, 6. 5 more than the 7 days before". -->
+    <string name="reports_metric_description">%1$s, %2$s</string>
+    <string name="reports_metric_description_compared">%1$s, %2$s. %3$s</string>
+
+    <!-- Comparisons with the window before, in full: what a screen reader hears
+         for each figure. Stated, not judged: no colour, because a quiet week is
+         information to a pieceworker, not a failure. -->
+    <string name="reports_more_than_yesterday">%1$s more than yesterday</string>
+    <string name="reports_fewer_than_yesterday">%1$s fewer than yesterday</string>
+    <string name="reports_same_as_yesterday">Same as yesterday</string>
+    <string name="reports_more_than_last_week">%1$s more than the 7 days before</string>
+    <string name="reports_fewer_than_last_week">%1$s fewer than the 7 days before</string>
+    <string name="reports_more_than_last_month">%1$s more than the 30 days before</string>
+    <string name="reports_fewer_than_last_month">%1$s fewer than the 30 days before</string>
+    <string name="reports_same_as_before">Same as the period before</string>
+
+    <!-- The daily chart. -->
+    <string name="reports_chart_jobs_title">Finished, day by day</string>
+    <string name="reports_chart_items_title">Items, day by day</string>
+    <string name="reports_chart_today_title">Today against yesterday</string>
+    <string name="reports_chart_average">Average %1$s a day</string>
+    <string name="reports_chart_hint">Tap a bar to see its day</string>
+    <string name="reports_chart_selection">%1$s · %2$s</string>
+    <plurals name="reports_jobs_value">
+        <item quantity="one">%1$s job</item>
+        <item quantity="other">%1$s jobs</item>
+    </plurals>
+    <plurals name="reports_items_value">
+        <item quantity="one">%1$s item</item>
+        <item quantity="other">%1$s items</item>
+    </plurals>
+    <!-- Read by screen readers in place of the bars. -->
+    <string name="reports_chart_description">%1$s. Total %2$s. Busiest day %3$s, with %4$s.</string>
+    <string name="reports_chart_description_empty">%1$s. Nothing recorded.</string>
+
+    <!-- How the period's work stands, by status. -->
+    <string name="reports_split_title">Where this period\'s work stands</string>
+    <plurals name="reports_split_recorded">
+        <item quantity="one">%1$s entry recorded</item>
+        <item quantity="other">%1$s entries recorded</item>
+    </plurals>
+
+    <!-- Waiting to be delivered: about now, not the selected period. -->
+    <string name="reports_awaiting_delivery">Waiting to be delivered</string>
+    <string name="reports_waiting_oldest">Oldest finished %1$s · any date</string>
+    <string name="reports_waiting_open">Show work waiting to be delivered</string>
 </resources>

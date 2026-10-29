@@ -2,12 +2,15 @@ package com.evergreen.trackora.feature.reports
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -19,9 +22,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -32,135 +39,210 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.evergreen.trackora.common.R as CommonR
+import com.evergreen.trackora.domain.model.Status
 import com.evergreen.trackora.ui.components.IconTile
 import com.evergreen.trackora.ui.components.ScreenHeader
 import com.evergreen.trackora.ui.components.TrackoraEmptyState
 import com.evergreen.trackora.ui.components.TrackoraErrorState
 import com.evergreen.trackora.ui.components.TrackoraLoadingState
 import com.evergreen.trackora.ui.components.cardBorder
+import com.evergreen.trackora.ui.text.localizedDate
+import com.evergreen.trackora.ui.text.localizedDateRange
+import com.evergreen.trackora.ui.text.localizedDayOfMonth
 import com.evergreen.trackora.ui.text.localizedNumber
+import com.evergreen.trackora.ui.text.localizedRelativeDate
+import com.evergreen.trackora.ui.text.localizedWeekdayShort
 import com.evergreen.trackora.ui.theme.TrackoraIcons
 import com.evergreen.trackora.ui.theme.TrackoraMotion
 import com.evergreen.trackora.ui.theme.TrackoraSpacing
 import com.evergreen.trackora.ui.theme.cardContainer
-import com.evergreen.trackora.ui.theme.statusColors
+import com.evergreen.trackora.ui.theme.statusAccent
+import com.evergreen.trackora.util.PersianDigits
+import java.time.LocalDate
+import java.util.Locale
+import kotlin.math.abs
 
 /**
- * Reports screen for viewing numeric summaries.
+ * Reports, told as a short story about the chosen period rather than as a
+ * grid of tiles:
  *
- * The window is picked with a segmented control rather than chips: exactly one
- * is always selected, which is what segmented buttons say and filter chips do
- * not. The subtitle names the window in plain words — "Last 7 days" — because
- * "Weekly" leaves open whether that means this calendar week.
+ *  1. **How much, and when** — jobs finished and items made, large, each with
+ *     how it moved against the period before; and beneath them, whichever is
+ *     chosen, day by day, so a busy Tuesday and a quiet Thursday are visible
+ *     instead of averaged away. Tap a bar to read it.
+ *  2. **Where it stands** — of everything recorded in the period, how much is
+ *     still in progress, finished and waiting, or delivered.
+ *  3. **What to do next** — work waiting to be delivered, across all dates,
+ *     and a way straight to it.
+ *
+ * Every figure comes from the same entries the totals are counted from, so
+ * the bars always add up to the figure above them and nothing here is
+ * estimated.
  */
 
-private enum class ReportsRange {
-    DAILY, WEEKLY, MONTHLY
-}
+private enum class ReportsRange { DAILY, WEEKLY, MONTHLY }
+
+private enum class ChartMeasure { JOBS, ITEMS }
 
 @Composable
 fun ReportsScreen(
     contentPadding: PaddingValues,
-    viewModel: ReportsViewModel
+    viewModel: ReportsViewModel,
+    /** Opens the work waiting to be delivered, in All Work. */
+    onOpenWaiting: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    var selectedRange by rememberSaveable { mutableStateOf(ReportsRange.DAILY) }
+    var range by rememberSaveable { mutableStateOf(ReportsRange.WEEKLY) }
+    var measure by rememberSaveable { mutableStateOf(ChartMeasure.JOBS) }
     val ready = !uiState.isLoading && uiState.errorMessage == null
+    val today = uiState.today
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(contentPadding)
-            // Scrolls so the figures stay reachable at large text sizes.
             .verticalScroll(rememberScrollState())
+            .padding(bottom = TrackoraSpacing.xxl)
     ) {
         ScreenHeader(
             title = stringResource(id = R.string.reports_title),
-            subtitle = if (ready) {
-                stringResource(
-                    id = when (selectedRange) {
-                        ReportsRange.DAILY -> R.string.reports_period_daily
-                        ReportsRange.WEEKLY -> R.string.reports_period_weekly
-                        ReportsRange.MONTHLY -> R.string.reports_period_monthly
-                    }
-                )
-            } else {
-                null
-            }
+            subtitle = if (ready) periodSubtitle(range, today) else null
         )
 
         if (uiState.isLoading) {
             TrackoraLoadingState()
-        } else if (uiState.errorMessage != null) {
+            return@Column
+        }
+        if (uiState.errorMessage != null) {
             TrackoraErrorState(
                 title = stringResource(id = CommonR.string.state_error_title),
                 message = stringResource(id = CommonR.string.state_error_body),
                 retryLabel = stringResource(id = CommonR.string.state_retry),
                 onRetry = viewModel::retry
             )
-        } else {
-            RangeSelector(
-                selectedRange = selectedRange,
-                onRangeSelected = { selectedRange = it },
+            return@Column
+        }
+
+        RangeSelector(
+            selected = range,
+            onSelected = { range = it },
+            modifier = Modifier.padding(horizontal = TrackoraSpacing.screen)
+        )
+
+        val summary = when (range) {
+            ReportsRange.DAILY -> uiState.daily
+            ReportsRange.WEEKLY -> uiState.weekly
+            ReportsRange.MONTHLY -> uiState.monthly
+        }
+
+        if (!summary.hasActivity && uiState.undeliveredCount == 0) {
+            // A grid of zeros looks like a broken screen. Say what is
+            // actually true: nothing was recorded in this window.
+            TrackoraEmptyState(
+                title = stringResource(id = R.string.reports_empty_title),
+                body = stringResource(id = R.string.reports_empty_body),
+                icon = TrackoraIcons.ReportsOutlined
+            )
+            return@Column
+        }
+
+        if (summary.hasActivity) {
+            Spacer(modifier = Modifier.height(TrackoraSpacing.lg))
+            ActivityCard(
+                summary = summary,
+                range = range,
+                measure = measure,
+                onMeasureChange = { measure = it },
+                today = today,
                 modifier = Modifier.padding(horizontal = TrackoraSpacing.screen)
             )
+        } else {
+            // Nothing in this period, but work still waits. Two giant zeros
+            // and an empty chart would say the same thing worse — and a
+            // Persian zero is a dot, which at display size looks like a fault.
+            TrackoraEmptyState(
+                title = stringResource(id = R.string.reports_empty_title),
+                body = stringResource(id = R.string.reports_empty_body),
+                icon = TrackoraIcons.ReportsOutlined
+            )
+        }
 
-            Spacer(modifier = Modifier.height(TrackoraSpacing.lg))
+        if (summary.recorded > 0) {
+            Spacer(modifier = Modifier.height(TrackoraSpacing.md))
+            SplitCard(
+                summary = summary,
+                modifier = Modifier.padding(horizontal = TrackoraSpacing.screen)
+            )
+        }
 
-            val currentSummary = when (selectedRange) {
-                ReportsRange.DAILY -> uiState.daily
-                ReportsRange.WEEKLY -> uiState.weekly
-                ReportsRange.MONTHLY -> uiState.monthly
-            }
-
-            if (!currentSummary.hasActivity && uiState.undeliveredCount == 0) {
-                // A grid of zeros looks like a broken screen. Say what is
-                // actually true: nothing was recorded in this window.
-                TrackoraEmptyState(
-                    title = stringResource(id = R.string.reports_empty_title),
-                    body = stringResource(id = R.string.reports_empty_body),
-                    icon = TrackoraIcons.ReportsOutlined
-                )
-            } else {
-                ReportsFigures(
-                    summary = currentSummary,
-                    undeliveredCount = uiState.undeliveredCount,
-                    modifier = Modifier.padding(horizontal = TrackoraSpacing.screen)
-                )
-            }
+        if (uiState.undeliveredCount > 0) {
+            Spacer(modifier = Modifier.height(TrackoraSpacing.md))
+            WaitingCard(
+                count = uiState.undeliveredCount,
+                oldest = uiState.oldestWaiting,
+                today = today,
+                onOpen = onOpenWaiting,
+                modifier = Modifier.padding(horizontal = TrackoraSpacing.screen)
+            )
         }
     }
+}
+
+/** "Last 7 days · Oct 21 – 27, 2026": what the period is, then exactly which days. */
+@Composable
+private fun periodSubtitle(range: ReportsRange, today: LocalDate): String = when (range) {
+    ReportsRange.DAILY -> localizedDate(today, includeWeekday = true)
+    ReportsRange.WEEKLY -> stringResource(
+        R.string.reports_period_with_dates,
+        stringResource(R.string.reports_period_weekly),
+        localizedDateRange(today.minusDays(6), today)
+    )
+    ReportsRange.MONTHLY -> stringResource(
+        R.string.reports_period_with_dates,
+        stringResource(R.string.reports_period_monthly),
+        localizedDateRange(today.minusDays(29), today)
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RangeSelector(
-    selectedRange: ReportsRange,
-    onRangeSelected: (ReportsRange) -> Unit,
+    selected: ReportsRange,
+    onSelected: (ReportsRange) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val ranges = listOf(
-        ReportsRange.DAILY to R.string.reports_daily,
-        ReportsRange.WEEKLY to R.string.reports_weekly,
-        ReportsRange.MONTHLY to R.string.reports_monthly
+        ReportsRange.DAILY to R.string.reports_range_today,
+        ReportsRange.WEEKLY to R.string.reports_range_week,
+        ReportsRange.MONTHLY to R.string.reports_range_month
     )
     SingleChoiceSegmentedButtonRow(modifier = modifier.fillMaxWidth()) {
         ranges.forEachIndexed { index, (range, label) ->
             SegmentedButton(
-                selected = selectedRange == range,
-                onClick = { onRangeSelected(range) },
+                selected = selected == range,
+                onClick = { onSelected(range) },
                 shape = SegmentedButtonDefaults.itemShape(index = index, count = ranges.size),
                 colors = SegmentedButtonDefaults.colors(
                     activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -176,86 +258,167 @@ private fun RangeSelector(
 }
 
 /**
- * The figures for one window.
+ * The period's two figures and the days behind them, in one card. The
+ * figures are tabs, and the chart beneath draws whichever one is chosen.
  *
- * ### What this replaces
+ * They used to be a headline above a separate chart card with its own
+ * Jobs/Items switch. That put each number on screen twice, and the switch a
+ * card away from the figure it switched to. Now choosing a figure is choosing
+ * what the chart shows, so the two read as cause and effect.
  *
- * The previous card printed Completed, then Delivered, then Completed again
- * and Total quantity — the same number twice in one card, in two different
- * type sizes. It also had no empty state, so a user with no data saw a grid of
- * zeros rather than an explanation.
- *
- * The figures now answer the questions a self-employed worker actually asks:
- * how much did I finish, how many units was that, how does it compare with the
- * period before, and — the one that costs money — how much is still sitting
- * undelivered.
+ * For Today a single bar would say nothing, so the chart sets it against
+ * yesterday instead — the same comparison the figures make, drawn.
  */
 @Composable
-private fun ReportsFigures(
+private fun ActivityCard(
     summary: ReportSummary,
-    undeliveredCount: Int,
+    range: ReportsRange,
+    measure: ChartMeasure,
+    onMeasureChange: (ChartMeasure) -> Unit,
+    today: LocalDate,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.fillMaxWidth()) {
-        Row(
-            // Intrinsic min height so a two-line delta on one tile does not
-            // leave the other visibly short beside it.
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(IntrinsicSize.Min),
-            horizontalArrangement = Arrangement.spacedBy(TrackoraSpacing.md)
-        ) {
-            StatTile(
-                icon = TrackoraIcons.Completed,
-                iconContainer = MaterialTheme.statusColors.completedContainer,
-                iconContent = MaterialTheme.statusColors.onCompletedContainer,
-                label = stringResource(id = R.string.reports_completed),
-                value = summary.completed,
-                delta = summary.changeVsPrevious,
-                modifier = Modifier.weight(1f)
-            )
-            StatTile(
-                icon = TrackoraIcons.Quantity,
-                iconContainer = MaterialTheme.colorScheme.primaryContainer,
-                iconContent = MaterialTheme.colorScheme.onPrimaryContainer,
-                label = stringResource(id = R.string.reports_quantity),
-                value = summary.totalQuantity,
-                modifier = Modifier.weight(1f)
-            )
+    var selected by remember(range) { mutableStateOf<Int?>(null) }
+    val days = if (range == ReportsRange.DAILY) summary.previousDays + summary.days else summary.days
+    val values = days.map { if (measure == ChartMeasure.JOBS) it.finished else it.units }
+    val title = stringResource(
+        when {
+            range == ReportsRange.DAILY -> R.string.reports_chart_today_title
+            measure == ChartMeasure.JOBS -> R.string.reports_chart_jobs_title
+            else -> R.string.reports_chart_items_title
         }
+    )
+    val average = if (range == ReportsRange.DAILY || values.isEmpty()) null else values.sum().toFloat() / values.size
+    val labels = days.mapIndexed { index, day ->
+        when (range) {
+            ReportsRange.DAILY ->
+                stringResource(if (day.date == today) CommonR.string.date_today else CommonR.string.date_yesterday)
+            ReportsRange.WEEKLY -> localizedWeekdayShort(day.date)
+            // A label every seventh day, counted back from today so today is always labelled.
+            ReportsRange.MONTHLY -> if ((days.lastIndex - index) % 7 == 0) localizedDayOfMonth(day.date) else null
+        }
+    }
+    val valueText: @Composable (Int) -> String = { value ->
+        if (measure == ChartMeasure.JOBS) {
+            pluralStringResource(R.plurals.reports_jobs_value, value, localizedNumber(value))
+        } else {
+            pluralStringResource(R.plurals.reports_items_value, value, localizedNumber(value))
+        }
+    }
+    val description = chartDescription(title, days.map { it.date }, values, today, valueText)
 
-        // Present-tense, not scoped to the selected window, so it is separated
-        // from the two figures above rather than sitting in the same row.
-        if (undeliveredCount > 0) {
-            Spacer(modifier = Modifier.height(TrackoraSpacing.md))
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.medium,
-                color = MaterialTheme.colorScheme.tertiaryContainer,
-                contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.cardContainer,
+        border = cardBorder()
+    ) {
+        Column(modifier = Modifier.padding(TrackoraSpacing.md)) {
+            Row(
+                modifier = Modifier
+                    .height(IntrinsicSize.Min)
+                    .selectableGroup(),
+                horizontalArrangement = Arrangement.spacedBy(TrackoraSpacing.sm)
             ) {
-                Row(
+                val jobs = stringResource(R.string.reports_metric_jobs)
+                MetricTab(
+                    label = jobs,
+                    value = summary.completed,
+                    change = summary.changeVsPrevious,
+                    description = metricDescription(jobs, summary.completed, comparison(range, summary.changeVsPrevious)),
+                    selected = measure == ChartMeasure.JOBS,
+                    onClick = { onMeasureChange(ChartMeasure.JOBS) },
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = TrackoraSpacing.lg, vertical = 14.dp)
-                        .semantics(mergeDescendants = true) {},
-                    horizontalArrangement = Arrangement.spacedBy(TrackoraSpacing.md),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconTile(
-                        icon = TrackoraIcons.Waiting,
-                        container = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.1f),
-                        content = MaterialTheme.colorScheme.onTertiaryContainer,
-                        size = 36.dp
-                    )
+                        .weight(1f)
+                        .fillMaxHeight()
+                )
+                val items = stringResource(R.string.reports_metric_items)
+                MetricTab(
+                    label = items,
+                    value = summary.totalQuantity,
+                    change = summary.quantityChangeVsPrevious,
+                    description = metricDescription(
+                        items,
+                        summary.totalQuantity,
+                        comparison(range, summary.quantityChangeVsPrevious)
+                    ),
+                    selected = measure == ChartMeasure.ITEMS,
+                    onClick = { onMeasureChange(ChartMeasure.ITEMS) },
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                )
+            }
+
+            Column(modifier = Modifier.padding(horizontal = TrackoraSpacing.xs)) {
+                // What both movements are measured against, said once.
+                if (summary.changeVsPrevious != null || summary.quantityChangeVsPrevious != null) {
                     Text(
-                        text = stringResource(id = R.string.reports_awaiting_delivery),
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.weight(1f)
+                        text = stringResource(comparedWith(range)),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .padding(top = TrackoraSpacing.sm)
+                            // The tabs already say it in full to a screen reader.
+                            .clearAndSetSemantics {}
                     )
-                    AnimatedNumber(
-                        value = undeliveredCount,
-                        style = MaterialTheme.typography.titleLarge
+                }
+
+                // What the chart is showing right now: the tapped day, or the
+                // average it should be read against, keyed to its dashed line.
+                val readout = selected?.let { index ->
+                    Readout(
+                        text = stringResource(
+                            R.string.reports_chart_selection,
+                            localizedRelativeDate(days[index].date, today),
+                            valueText(values[index])
+                        ),
+                        isSelection = true
+                    )
+                } ?: average?.let { Readout(stringResource(R.string.reports_chart_average, formatAverage(it))) }
+                ?: Readout(stringResource(R.string.reports_chart_hint))
+                AnimatedContent(
+                    targetState = readout,
+                    transitionSpec = { fadeIn(tween(TrackoraMotion.SHORT)) togetherWith fadeOut(tween(TrackoraMotion.SHORT)) },
+                    modifier = Modifier.padding(top = TrackoraSpacing.lg),
+                    label = "chartReadout"
+                ) { shown ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(TrackoraSpacing.sm)
+                    ) {
+                        if (!shown.isSelection && average != null) AverageLineKey()
+                        Text(
+                            text = shown.text,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = if (shown.isSelection) FontWeight.SemiBold else FontWeight.Normal,
+                            color = if (shown.isSelection) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(TrackoraSpacing.md))
+                DailyBarChart(
+                    values = values,
+                    labels = labels,
+                    emphasisIndex = days.indexOfFirst { it.date == today }.takeIf { it >= 0 },
+                    selectedIndex = selected,
+                    onSelect = { selected = it },
+                    average = average,
+                    showValues = values.size <= 7,
+                    description = description
+                )
+
+                if (selected == null && average != null) {
+                    Text(
+                        text = stringResource(R.string.reports_chart_hint),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = TrackoraSpacing.md, bottom = TrackoraSpacing.xs)
                     )
                 }
             }
@@ -263,57 +426,329 @@ private fun ReportsFigures(
     }
 }
 
+private data class Readout(val text: String, val isSelection: Boolean = false)
+
 /**
- * One figure, with an optional change against the previous period.
+ * One of the period's figures, as a tab over the chart: what it counts, the
+ * number, and how it moved against the period before.
  *
- * The delta is plain text rather than a coloured arrow: for a pieceworker a
- * quiet month is information, not a failure, and painting it red would be the
- * app passing judgement on their week.
+ * The movement is an arrow and a few words — "5 more" — and the period it is
+ * measured against is named once, beneath both tabs; a full sentence under
+ * each number wrapped onto two lines on a phone and said the period twice.
+ * It stays uncoloured, because a quiet week is information to a pieceworker,
+ * not a failure.
+ *
+ * The chosen tab is filled and the other outlined, so the choice never rests
+ * on colour alone. A screen reader hears it as one tab, with the full
+ * sentence from [description].
+ *
+ * @param change the difference from the period before, or null when there
+ *   is nothing to compare.
  */
 @Composable
-private fun StatTile(
-    icon: ImageVector,
-    iconContainer: Color,
-    iconContent: Color,
+internal fun MetricTab(
     label: String,
     value: Int,
+    change: Int?,
+    description: String,
+    selected: Boolean,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    delta: Int? = null,
 ) {
+    val fill by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+        animationSpec = tween(TrackoraMotion.SHORT),
+        label = "metricFill"
+    )
+    val edge by animateColorAsState(
+        targetValue = if (selected) Color.Transparent else MaterialTheme.colorScheme.outlineVariant,
+        animationSpec = tween(TrackoraMotion.SHORT),
+        label = "metricEdge"
+    )
+    val ink = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+    val quiet = if (selected) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val shape = MaterialTheme.shapes.medium
+
+    Column(
+        modifier = modifier
+            .clip(shape)
+            .background(fill)
+            .border(1.dp, edge, shape)
+            .selectable(selected = selected, role = Role.Tab, onClick = onClick)
+            .clearAndSetSemantics { contentDescription = description }
+            .padding(horizontal = TrackoraSpacing.md, vertical = TrackoraSpacing.sm)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            color = quiet,
+            maxLines = 2
+        )
+        // Figures need none of the room Persian letters do above and below
+        // the line, so the number sits tighter than its style.
+        AnimatedNumber(
+            value = value,
+            style = MaterialTheme.typography.displaySmall.copy(lineHeight = 46.sp),
+            color = ink
+        )
+        if (change != null) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(TrackoraSpacing.xs)
+            ) {
+                Icon(
+                    imageVector = when {
+                        change > 0 -> TrackoraIcons.TrendUp
+                        change < 0 -> TrackoraIcons.TrendDown
+                        else -> TrackoraIcons.TrendFlat
+                    },
+                    contentDescription = null,
+                    tint = quiet,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = when {
+                        change > 0 -> stringResource(R.string.reports_delta_more, localizedNumber(change))
+                        change < 0 -> stringResource(R.string.reports_delta_fewer, localizedNumber(-change))
+                        else -> stringResource(R.string.reports_delta_same)
+                    },
+                    style = MaterialTheme.typography.labelMedium,
+                    color = quiet
+                )
+            }
+        }
+    }
+}
+
+/** The period the figures' movements are measured against. */
+private fun comparedWith(range: ReportsRange): Int = when (range) {
+    ReportsRange.DAILY -> R.string.reports_compared_yesterday
+    ReportsRange.WEEKLY -> R.string.reports_compared_week
+    ReportsRange.MONTHLY -> R.string.reports_compared_month
+}
+
+/** "Jobs finished, 6. 5 more than the 7 days before": a tab, read aloud. */
+@Composable
+private fun metricDescription(label: String, value: Int, comparison: String?): String =
+    if (comparison == null) {
+        stringResource(R.string.reports_metric_description, label, localizedNumber(value))
+    } else {
+        stringResource(R.string.reports_metric_description_compared, label, localizedNumber(value), comparison)
+    }
+
+/** How a figure compares with the period before, as a sentence, or null when there is nothing to compare. */
+@Composable
+private fun comparison(range: ReportsRange, delta: Int?): String? {
+    delta ?: return null
+    val amount = localizedNumber(abs(delta))
+    return when {
+        delta == 0 && range == ReportsRange.DAILY -> stringResource(R.string.reports_same_as_yesterday)
+        delta == 0 -> stringResource(R.string.reports_same_as_before)
+        delta > 0 -> stringResource(
+            when (range) {
+                ReportsRange.DAILY -> R.string.reports_more_than_yesterday
+                ReportsRange.WEEKLY -> R.string.reports_more_than_last_week
+                ReportsRange.MONTHLY -> R.string.reports_more_than_last_month
+            },
+            amount
+        )
+        else -> stringResource(
+            when (range) {
+                ReportsRange.DAILY -> R.string.reports_fewer_than_yesterday
+                ReportsRange.WEEKLY -> R.string.reports_fewer_than_last_week
+                ReportsRange.MONTHLY -> R.string.reports_fewer_than_last_month
+            },
+            amount
+        )
+    }
+}
+
+/** What a screen reader hears in place of the bars: the total, and the busiest day. */
+@Composable
+private fun chartDescription(
+    title: String,
+    dates: List<LocalDate>,
+    values: List<Int>,
+    today: LocalDate,
+    valueText: @Composable (Int) -> String,
+): String {
+    val busiest = values.indices.maxByOrNull { values[it] }
+    return if (busiest == null || values[busiest] == 0) {
+        stringResource(R.string.reports_chart_description_empty, title)
+    } else {
+        stringResource(
+            R.string.reports_chart_description,
+            title,
+            valueText(values.sum()),
+            localizedRelativeDate(dates[busiest], today),
+            valueText(values[busiest])
+        )
+    }
+}
+
+/** An average to one decimal place, without a trailing ".0", in the locale's digits. */
+@Composable
+private fun formatAverage(value: Float): String {
+    val rounded = Math.round(value * 10) / 10f
+    val plain = if (rounded % 1f == 0f) rounded.toInt().toString() else String.format(Locale.US, "%.1f", rounded)
+    val persian = LocalConfiguration.current.locales[0].language == "fa"
+    // Persian writes the decimal point as U+066B.
+    return if (persian) PersianDigits.toPersian(plain.replace('.', '٫')) else plain
+}
+
+/**
+ * How the period's recorded work stands now: still in progress, finished and
+ * waiting, or delivered. The same three colours as the cards in All Work.
+ *
+ * Under the bar, a column per status with its count large, in the order of
+ * the bar's segments, so the bar is read for proportion and the columns for
+ * the number — rather than a run of inline labels that wrapped unevenly.
+ */
+@Composable
+private fun SplitCard(
+    summary: ReportSummary,
+    modifier: Modifier = Modifier,
+) {
+    val parts = listOf(
+        Status.IN_PROGRESS to summary.inProgress,
+        Status.COMPLETED to summary.waiting,
+        Status.DELIVERED to summary.delivered
+    )
     Surface(
-        modifier = modifier.fillMaxHeight(),
+        modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.cardContainer,
         border = cardBorder()
     ) {
         Column(
-            modifier = Modifier
-                .padding(TrackoraSpacing.lg)
-                .semantics(mergeDescendants = true) {}
+            modifier = Modifier.padding(TrackoraSpacing.lg),
+            verticalArrangement = Arrangement.spacedBy(TrackoraSpacing.md)
         ) {
-            IconTile(icon = icon, container = iconContainer, content = iconContent, size = 36.dp)
-            Spacer(modifier = Modifier.height(TrackoraSpacing.md))
-            AnimatedNumber(
-                value = value,
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            if (delta != null && delta != 0) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = stringResource(
-                        id = if (delta > 0) R.string.reports_delta_up else R.string.reports_delta_down,
-                        localizedNumber(kotlin.math.abs(delta))
+                    text = stringResource(R.string.reports_split_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = pluralStringResource(
+                        R.plurals.reports_split_recorded,
+                        summary.recorded,
+                        localizedNumber(summary.recorded)
                     ),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = TrackoraSpacing.sm)
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            SplitBar(parts = parts.map { (status, count) -> count to statusAccent(status) })
+            Row(horizontalArrangement = Arrangement.spacedBy(TrackoraSpacing.sm)) {
+                parts.forEach { (status, count) ->
+                    StatusCount(
+                        icon = TrackoraIcons.forStatus(status),
+                        color = statusAccent(status),
+                        label = stringResource(statusName(status)),
+                        count = count,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatusCount(
+    icon: ImageVector,
+    color: Color,
+    label: String,
+    count: Int,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.semantics(mergeDescendants = true) {}) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(TrackoraSpacing.xs)
+        ) {
+            Icon(imageVector = icon, contentDescription = null, tint = color, modifier = Modifier.size(15.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2
+            )
+        }
+        AnimatedNumber(
+            value = count,
+            style = MaterialTheme.typography.titleLarge,
+            color = if (count == 0) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+private fun statusName(status: Status): Int = when (status) {
+    Status.IN_PROGRESS -> CommonR.string.status_in_progress
+    Status.COMPLETED -> CommonR.string.status_completed
+    Status.DELIVERED -> CommonR.string.status_delivered
+}
+
+/**
+ * Work finished and not yet delivered — about now, across all dates, so it
+ * is the one figure here that does not move with the period. It is also the
+ * one that asks for something to be done, so it opens that work in All Work.
+ */
+@Composable
+private fun WaitingCard(
+    count: Int,
+    oldest: LocalDate?,
+    today: LocalDate,
+    onOpen: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val openLabel = stringResource(R.string.reports_waiting_open)
+    Surface(
+        onClick = onOpen,
+        modifier = modifier
+            .fillMaxWidth()
+            .semantics {
+                role = Role.Button
+                onClick(label = openLabel, action = null)
+            },
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+    ) {
+        Row(
+            modifier = Modifier.padding(TrackoraSpacing.lg),
+            horizontalArrangement = Arrangement.spacedBy(TrackoraSpacing.md),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconTile(
+                icon = TrackoraIcons.Waiting,
+                container = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.1f),
+                content = MaterialTheme.colorScheme.onTertiaryContainer
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.reports_awaiting_delivery),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                if (oldest != null) {
+                    Text(
+                        text = stringResource(R.string.reports_waiting_oldest, localizedRelativeDate(oldest, today)),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+            AnimatedNumber(value = count, style = MaterialTheme.typography.headlineSmall)
+            Icon(imageVector = TrackoraIcons.Forward, contentDescription = null)
         }
     }
 }
