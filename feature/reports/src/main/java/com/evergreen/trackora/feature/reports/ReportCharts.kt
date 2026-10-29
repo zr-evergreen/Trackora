@@ -3,6 +3,7 @@ package com.evergreen.trackora.feature.reports
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,7 +11,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,6 +21,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -46,9 +50,11 @@ import kotlin.math.min
  * use the locale's digits, and stay within the app's own colours.
  *
  * Quiet days are drawn as a short stub on the baseline rather than left out,
- * so a gap reads as "nothing that day" and never as a missing bar. The day
- * in [emphasisIndex] — today — is drawn solid and the rest softer; tapping a
- * bar selects it instead, and tapping it again clears the selection.
+ * so a gap reads as "nothing that day" and never as a missing bar. Every day
+ * is drawn in full colour; the day in [emphasisIndex] — today — is marked by
+ * its label, set on a pill, rather than by fading the others, which made a
+ * week with nothing yet today look switched off. Tapping a bar selects it and
+ * the rest step back; tapping it again clears the selection.
  *
  * Screen readers get [description] in place of the bars.
  *
@@ -70,7 +76,9 @@ internal fun DailyBarChart(
     modifier: Modifier = Modifier,
 ) {
     val accent = MaterialTheme.colorScheme.primary
-    val soft = accent.copy(alpha = 0.42f)
+    val soft = accent.copy(alpha = 0.32f)
+    val todayPill = MaterialTheme.colorScheme.primaryContainer
+    val onTodayPill = MaterialTheme.colorScheme.onPrimaryContainer
     val stub = MaterialTheme.colorScheme.outlineVariant
     val ink = MaterialTheme.colorScheme.onSurfaceVariant
     val valueStyle = MaterialTheme.typography.labelSmall.copy(color = ink, fontWeight = FontWeight.Medium)
@@ -126,7 +134,7 @@ internal fun DailyBarChart(
             if (average != null && average > 0f) {
                 val y = baseline - plot * (average / highest) * growth.value
                 drawLine(
-                    color = ink.copy(alpha = 0.55f),
+                    color = ink.copy(alpha = AVERAGE_LINE_ALPHA),
                     start = Offset(0f, y),
                     end = Offset(size.width, y),
                     strokeWidth = 1.dp.toPx(),
@@ -138,6 +146,8 @@ internal fun DailyBarChart(
                 val slot = if (rtl) count - 1 - index else index
                 val centre = slotWidth * slot + slotWidth / 2
                 val selected = index == selectedIndex
+                val dimmed = selectedIndex != null && !selected
+                // Whose figure is printed strongest: the tapped day, or today.
                 val emphasised = if (selectedIndex != null) selected else index == emphasisIndex
 
                 if (value == 0) {
@@ -150,7 +160,7 @@ internal fun DailyBarChart(
                 } else {
                     val height = max(plot * value / highest * growth.value, stubHeight)
                     drawRoundRect(
-                        color = if (emphasised) accent else soft,
+                        color = if (dimmed) soft else accent,
                         topLeft = Offset(centre - barWidth / 2, baseline - height),
                         size = Size(barWidth, height),
                         cornerRadius = radius
@@ -180,15 +190,31 @@ internal fun DailyBarChart(
             labels.forEachIndexed { index, label ->
                 Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     if (label != null) {
-                        val strong = index == (selectedIndex ?: emphasisIndex)
+                        val isToday = index == emphasisIndex
+                        val selected = index == selectedIndex
                         Text(
                             text = label,
                             style = MaterialTheme.typography.labelSmall,
-                            fontWeight = if (strong) FontWeight.Bold else FontWeight.Normal,
-                            color = if (strong) accent else ink,
+                            fontWeight = if (isToday || selected) FontWeight.Bold else FontWeight.Normal,
+                            color = when {
+                                isToday -> onTodayPill
+                                selected -> accent
+                                else -> ink
+                            },
                             maxLines = 1,
                             softWrap = false,
-                            modifier = Modifier.wrapContentWidth(unbounded = true)
+                            modifier = Modifier
+                                .wrapContentWidth(unbounded = true)
+                                .then(
+                                    if (isToday) {
+                                        Modifier
+                                            .clip(CircleShape)
+                                            .background(todayPill)
+                                            .padding(horizontal = 6.dp)
+                                    } else {
+                                        Modifier
+                                    }
+                                )
                         )
                     }
                 }
@@ -196,6 +222,26 @@ internal fun DailyBarChart(
         }
     }
 }
+
+/**
+ * The dashed average line in miniature, set before the words that name it,
+ * so the one line on the chart without a label still says what it is.
+ */
+@Composable
+internal fun AverageLineKey(modifier: Modifier = Modifier) {
+    val color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AVERAGE_LINE_ALPHA)
+    Canvas(modifier = modifier.size(width = 20.dp, height = 2.dp)) {
+        drawLine(
+            color = color,
+            start = Offset(0f, center.y),
+            end = Offset(size.width, center.y),
+            strokeWidth = 1.5.dp.toPx(),
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 4.dp.toPx()))
+        )
+    }
+}
+
+private const val AVERAGE_LINE_ALPHA = 0.55f
 
 /**
  * Proportions as one bar cut into coloured lengths, in reading order — the
