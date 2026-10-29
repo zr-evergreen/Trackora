@@ -76,8 +76,6 @@ import com.evergreen.trackora.domain.model.WorkEntry
 import com.evergreen.trackora.ui.components.ScreenHeader
 import com.evergreen.trackora.ui.components.TrackoraEmptyState
 import com.evergreen.trackora.ui.components.TrackoraErrorState
-import com.evergreen.trackora.ui.components.TrackoraFilterChip
-import com.evergreen.trackora.ui.components.TrackoraFilterRow
 import com.evergreen.trackora.ui.components.TrackoraLoadingState
 import com.evergreen.trackora.ui.components.WorkEntryRow
 import com.evergreen.trackora.ui.components.trackoraTextFieldColors
@@ -90,9 +88,6 @@ import com.evergreen.trackora.ui.theme.TrackoraIcons
 import com.evergreen.trackora.ui.theme.TrackoraMotion
 import com.evergreen.trackora.ui.theme.TrackoraSpacing
 import com.evergreen.trackora.ui.theme.cardContainer
-import com.evergreen.trackora.ui.theme.container
-import com.evergreen.trackora.ui.theme.content
-import com.evergreen.trackora.ui.theme.statusColors
 import kotlin.math.roundToInt
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
@@ -110,8 +105,9 @@ import java.time.temporal.ChronoUnit
  *
  * ### Finding
  *
- * Each status filter says how many entries it holds within the current
- * search, so the effect of a tap is visible before it is made. Matches are
+ * The status filters are an overview of the list — all four always in view,
+ * each led by how many entries it holds within the current search — so the
+ * effect of a tap is visible before it is made; see [StatusOverview]. Matches are
  * highlighted in each card, and a match in a customer name or job code is
  * shown on the card, so every result says why it is there. When a search
  * or filter leaves nothing, one button clears both.
@@ -213,12 +209,13 @@ fun AllWorkScreen(
                 onClear = viewModel::clearQuery,
                 modifier = Modifier.padding(horizontal = TrackoraSpacing.screen)
             )
-            Spacer(modifier = Modifier.height(TrackoraSpacing.md))
-            StatusFilterRow(
+            Spacer(modifier = Modifier.height(TrackoraSpacing.sm))
+            StatusOverview(
                 selected = uiState.filter,
                 allCount = uiState.matchingCount,
                 counts = uiState.countsByStatus,
-                onFilterSelected = viewModel::setFilter
+                onSelect = viewModel::setFilter,
+                modifier = Modifier.padding(horizontal = TrackoraSpacing.screen)
             )
             // A hairline under the pinned controls once cards pass beneath them.
             val edge by animateFloatAsState(
@@ -560,44 +557,6 @@ private fun SwipeableEntry(
             showDate = showDate,
             searchQuery = searchQuery
         )
-    }
-}
-
-/**
- * The status filters, each with how many entries it would show within the
- * current search. A status chip takes on its status's own colour and icon
- * when chosen.
- */
-@Composable
-private fun StatusFilterRow(
-    selected: Status?,
-    allCount: Int,
-    counts: Map<Status, Int>,
-    onFilterSelected: (Status?) -> Unit
-) {
-    val statusColors = MaterialTheme.statusColors
-    TrackoraFilterRow(contentPadding = PaddingValues(horizontal = TrackoraSpacing.screen)) {
-        TrackoraFilterChip(
-            label = stringResource(id = R.string.filter_all),
-            selected = selected == null,
-            onClick = { onFilterSelected(null) },
-            count = allCount
-        )
-        listOf(
-            Status.IN_PROGRESS to R.string.filter_in_progress,
-            Status.COMPLETED to R.string.filter_completed,
-            Status.DELIVERED to R.string.filter_delivered
-        ).forEach { (status, label) ->
-            TrackoraFilterChip(
-                label = stringResource(id = label),
-                selected = selected == status,
-                onClick = { onFilterSelected(status) },
-                icon = TrackoraIcons.forStatus(status),
-                selectedContainerColor = statusColors.container(status),
-                selectedContentColor = statusColors.content(status),
-                count = counts[status] ?: 0
-            )
-        }
     }
 }
 

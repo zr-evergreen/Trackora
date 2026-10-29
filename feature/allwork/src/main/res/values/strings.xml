@@ -33,4 +33,6 @@
     <string name="all_work_summary">%1$s · %2$s</string>
     <!-- Clears the search and the status filter when they hide everything. -->
     <string name="all_work_show_all">Show all work</string>
+    <!-- A status filter as a screen reader hears it: "In Progress, 3 entries". -->
+    <string name="all_work_filter_description">%1$s, %2$s</string>
 </resources>

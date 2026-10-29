@@ -11,7 +11,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,10 +18,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.evergreen.trackora.ui.text.localizedNumber
 import com.evergreen.trackora.ui.theme.TrackoraIcons
 
 /**
@@ -44,11 +41,6 @@ fun TrackoraFilterChip(
     icon: ImageVector? = null,
     selectedContainerColor: Color = MaterialTheme.colorScheme.primaryContainer,
     selectedContentColor: Color = MaterialTheme.colorScheme.onPrimaryContainer,
-    /**
-     * How many entries the chip would show, printed after the label so a
-     * filter says what is behind it before it is tapped. Null for none.
-     */
-    count: Int? = null,
 ) {
     val leading = when {
         selected -> TrackoraIcons.Save
@@ -58,26 +50,12 @@ fun TrackoraFilterChip(
         selected = selected,
         onClick = onClick,
         label = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                if (count != null) {
-                    Text(
-                        text = localizedNumber(count),
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = LocalContentColor.current.copy(alpha = 0.7f),
-                        maxLines = 1
-                    )
-                }
-            }
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         },
         leadingIcon = leading?.let { vector ->
             {

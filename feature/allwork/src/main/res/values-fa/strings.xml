@@ -31,4 +31,5 @@
     <!-- Persian comma, not a middle dot: beside Persian digits a dot reads as a zero (۰). -->
     <string name="all_work_summary">%1$s، %2$s</string>
     <string name="all_work_show_all">نمایش همه کارها</string>
+    <string name="all_work_filter_description">%1$s، %2$s</string>
 </resources>
