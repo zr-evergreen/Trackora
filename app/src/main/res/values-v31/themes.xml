@@ -1,0 +1,12 @@
+<resources>
+    <!--
+        Android 12 and later can animate the splash icon, so the mark enters:
+        the three marks rise and the thread is drawn through them. Earlier
+        versions show it still (values/themes.xml).
+    -->
+    <style name="Theme.Trackora.Starting" parent="Base.Theme.Trackora.Starting">
+        <item name="android:windowLightNavigationBar">@bool/splash_light_system_bars</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_mark_animated</item>
+        <item name="windowSplashScreenAnimationDuration">700</item>
+    </style>
+</resources>

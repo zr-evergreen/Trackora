@@ -7,7 +7,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 
 import android.os.Bundle
+import android.view.animation.PathInterpolator
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.core.splashscreen.SplashScreenViewProvider
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.lifecycleScope
@@ -19,6 +22,7 @@ import androidx.navigation.compose.rememberNavController
 import com.evergreen.trackora.locale.LocaleManager
 import com.evergreen.trackora.navigation.NavGraph
 import com.evergreen.trackora.navigation.TodayRoute
+import com.evergreen.trackora.ui.theme.TrackoraMotion
 import com.evergreen.trackora.ui.theme.TrackoraTheme
 import com.evergreen.trackora.theme.ThemeManager
 import dagger.hilt.android.AndroidEntryPoint
@@ -35,6 +39,11 @@ class MainActivity : AppCompatActivity() {
     @Inject lateinit var themeManager: ThemeManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Before super.onCreate, as the library requires: it reads the splash
+        // theme, then swaps in Theme.Trackora once the first frame is ready.
+        // The splash stays only as long as the app takes to draw; nothing
+        // here holds it longer.
+        installSplashScreen().setOnExitAnimationListener(::leaveSplash)
         super.onCreate(savedInstanceState)
         lifecycleScope.launch {
             localeManager.applySavedLocale()
@@ -57,6 +66,31 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    /**
+     * Hands over from the splash to the first screen, which is already drawn
+     * beneath it: the splash fades as its mark lifts slightly towards the
+     * viewer, instead of being cut away. Short, because by now the app is
+     * ready and the splash is only in the way; with animations turned off it
+     * is removed at once.
+     */
+    private fun leaveSplash(splash: SplashScreenViewProvider) {
+        val duration = TrackoraMotion.MEDIUM.toLong()
+        // TrackoraMotion.EmphasizedAccelerate, as a platform interpolator.
+        val leaving = PathInterpolator(0.3f, 0f, 0.8f, 0.15f)
+        splash.iconView.animate()
+            .scaleX(1.08f)
+            .scaleY(1.08f)
+            .setDuration(duration)
+            .setInterpolator(leaving)
+            .start()
+        splash.view.animate()
+            .alpha(0f)
+            .setDuration(duration)
+            .setInterpolator(leaving)
+            .withEndAction(splash::remove)
+            .start()
     }
 
     /**
