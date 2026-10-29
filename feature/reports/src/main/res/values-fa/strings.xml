@@ -1,18 +1,65 @@
 <resources>
     <string name="reports_title">گزارش‌ها</string>
-    <string name="reports_daily">روزانه</string>
-    <string name="reports_weekly">هفتگی</string>
-    <string name="reports_monthly">ماهانه</string>
-    <string name="reports_completed">تکمیل‌شده</string>
-    <string name="reports_delivered">تحویل‌شده</string>
-    <string name="reports_quantity">تعداد کل</string>
-    <string name="reports_awaiting_delivery">در انتظار تحویل</string>
-    <string name="reports_delta_up">%1$s بیشتر از دوره قبل</string>
-    <string name="reports_delta_down">%1$s کمتر از دوره قبل</string>
     <string name="reports_empty_title">هنوز چیزی ثبت نشده</string>
     <string name="reports_empty_body">کارهایی که ثبت کنید اینجا خلاصه می‌شود.</string>
-    <!-- What the selected window covers, under the title. -->
-    <string name="reports_period_daily">امروز</string>
+
+    <!-- انتخاب بازه. جداکننده‌ها ویرگول فارسی‌اند، نه نقطهٔ وسط: کنار رقم فارسی، نقطه صفر (۰) خوانده می‌شود. -->
+    <string name="reports_range_today">امروز</string>
+    <string name="reports_range_week">۷ روز</string>
+    <string name="reports_range_month">۳۰ روز</string>
     <string name="reports_period_weekly">۷ روز گذشته</string>
     <string name="reports_period_monthly">۳۰ روز گذشته</string>
+    <string name="reports_period_with_dates">%1$s، %2$s</string>
+
+    <!-- عددهای اصلی: عدد جدا و درشت نوشته می‌شود؛ این‌ها واژه‌های پس از آن‌اند. -->
+    <plurals name="reports_jobs_finished">
+        <item quantity="one">کار تمام‌شده</item>
+        <item quantity="other">کار تمام‌شده</item>
+    </plurals>
+    <plurals name="reports_items_made">
+        <item quantity="one">عدد</item>
+        <item quantity="other">عدد</item>
+    </plurals>
+
+    <!-- مقایسه با بازهٔ قبل، بی‌قضاوت. -->
+    <string name="reports_more_than_yesterday">%1$s بیشتر از دیروز</string>
+    <string name="reports_fewer_than_yesterday">%1$s کمتر از دیروز</string>
+    <string name="reports_same_as_yesterday">برابر با دیروز</string>
+    <string name="reports_more_than_last_week">%1$s بیشتر از ۷ روز پیش از آن</string>
+    <string name="reports_fewer_than_last_week">%1$s کمتر از ۷ روز پیش از آن</string>
+    <string name="reports_more_than_last_month">%1$s بیشتر از ۳۰ روز پیش از آن</string>
+    <string name="reports_fewer_than_last_month">%1$s کمتر از ۳۰ روز پیش از آن</string>
+    <string name="reports_same_as_before">برابر با بازهٔ قبل</string>
+
+    <!-- نمودار روزانه. -->
+    <string name="reports_chart_jobs">کار</string>
+    <string name="reports_chart_items">عدد</string>
+    <string name="reports_chart_jobs_title">کار تمام‌شده، روز به روز</string>
+    <string name="reports_chart_items_title">عدد، روز به روز</string>
+    <string name="reports_chart_today_title">امروز در برابر دیروز</string>
+    <string name="reports_chart_average">میانگین %1$s در روز</string>
+    <string name="reports_chart_hint">برای دیدن هر روز روی ستونش بزنید</string>
+    <string name="reports_chart_selection">%1$s، %2$s</string>
+    <plurals name="reports_jobs_value">
+        <item quantity="one">%1$s کار</item>
+        <item quantity="other">%1$s کار</item>
+    </plurals>
+    <plurals name="reports_items_value">
+        <item quantity="one">%1$s عدد</item>
+        <item quantity="other">%1$s عدد</item>
+    </plurals>
+    <string name="reports_chart_description">%1$s. مجموع %2$s. پرکارترین روز %3$s، با %4$s.</string>
+    <string name="reports_chart_description_empty">%1$s. چیزی ثبت نشده.</string>
+
+    <!-- وضعیت کارهای این بازه. -->
+    <string name="reports_split_title">کارهای این بازه کجا هستند</string>
+    <plurals name="reports_split_recorded">
+        <item quantity="one">%1$s کار ثبت‌شده</item>
+        <item quantity="other">%1$s کار ثبت‌شده</item>
+    </plurals>
+
+    <!-- در انتظار تحویل: دربارهٔ اکنون، نه بازهٔ انتخاب‌شده. -->
+    <string name="reports_awaiting_delivery">در انتظار تحویل</string>
+    <string name="reports_waiting_oldest">قدیمی‌ترین تمام‌شده %1$s، از همهٔ تاریخ‌ها</string>
+    <string name="reports_waiting_open">نمایش کارهای در انتظار تحویل</string>
 </resources>

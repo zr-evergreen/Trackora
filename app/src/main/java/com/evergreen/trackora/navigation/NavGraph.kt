@@ -121,6 +121,18 @@ fun NavGraph(
             }
         }
     ) { paddingValues ->
+        // Work waiting to be delivered, in All Work: from Today's band and from
+        // the waiting figure in Reports.
+        val openWaitingWork: () -> Unit = {
+            // Once All Work has been visited from the bottom bar its state is
+            // saved, and restoring it brings back the arguments it was saved
+            // with — dropping the filter passed here. Discard that saved state
+            // and open it fresh instead.
+            navController.clearBackStack<AllWorkRoute>()
+            navController.navigate(AllWorkRoute(initialStatus = Status.COMPLETED.name)) {
+                launchSingleTop = true
+            }
+        }
         NavHost(
             navController = navController,
             startDestination = startDestination,
@@ -135,16 +147,7 @@ fun NavGraph(
                 snackbarHostState = todaySnackbarHostState,
                 // The band shows only the oldest few; the rest live in the
                 // history, where the Completed filter and search already exist.
-                onSeeAllUndelivered = {
-                    // Once All Work has been visited from the bottom bar its
-                    // state is saved, and restoring it brings back the
-                    // arguments it was saved with — dropping the filter passed
-                    // here. Discard that saved state and open it fresh instead.
-                    navController.clearBackStack<AllWorkRoute>()
-                    navController.navigate(AllWorkRoute(initialStatus = Status.COMPLETED.name)) {
-                        launchSingleTop = true
-                    }
-                },
+                onSeeAllUndelivered = openWaitingWork,
                 // Rows on Today are now tappable. Previously the only way to
                 // open an entry was via All Work, which users had no reason to
                 // discover.
@@ -160,7 +163,7 @@ fun NavGraph(
                 }
             )
 
-            reportsNavigation(contentPadding = paddingValues)
+            reportsNavigation(contentPadding = paddingValues, onOpenWaiting = openWaitingWork)
 
             composable<SettingsRoute> {
                 SettingsScreen(
