@@ -488,6 +488,46 @@ class AddEditWorkViewModelTest {
     }
 
     @Test
+    fun `cancelling a slow import frees Save and keeps the form`() = runTest {
+        // A cloud photo picked while offline can take as long as its provider
+        // likes; the form used to offer no way out but leaving the screen.
+        val picked = mockk<Uri>()
+        val copy = CompletableDeferred<String?>()
+        coEvery { galleryPhotoImporter.import(picked) } coAnswers { copy.await() }
+        val vm = viewModel()
+        vm.onTitleChange("Kept title")
+        vm.onGalleryPhotoPicked(picked)
+
+        vm.cancelPhotoImport()
+        copy.complete("content://photo/late")
+
+        assertFalse(vm.uiState.value.isImportingPhoto)
+        assertNull(vm.uiState.value.photoUri)
+        assertNull(vm.uiState.value.errorMessage)
+        assertEquals("Kept title", vm.uiState.value.title)
+
+        val entry = slot<WorkEntry>()
+        vm.save()
+        coVerify { insertWorkEntryUseCase(capture(entry)) }
+        assertNull(entry.captured.photoUri)
+    }
+
+    @Test
+    fun `a camera photo taken during an import replaces it`() = runTest {
+        val picked = mockk<Uri>()
+        val copy = CompletableDeferred<String?>()
+        coEvery { galleryPhotoImporter.import(picked) } coAnswers { copy.await() }
+        val vm = viewModel()
+        vm.onGalleryPhotoPicked(picked)
+
+        vm.onCameraPhotoTaken("content://camera/1")
+        copy.complete("content://photo/gallery")
+
+        assertEquals("content://camera/1", vm.uiState.value.photoUri)
+        assertFalse(vm.uiState.value.isImportingPhoto)
+    }
+
+    @Test
     fun `custom field names are exposed from settings`() = runTest {
         val vm = viewModel()
 

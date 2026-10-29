@@ -24,7 +24,6 @@
     <string name="today_quick_add_action">افزودن</string>
     <string name="today_section_undelivered">در انتظار تحویل</string>
     <string name="today_section_today">کارهای امروز</string>
-    <string name="today_deliver">تحویل شد</string>
     <string name="today_status_changed_toast">«%1$s» به‌روزرسانی شد</string>
     <string name="today_undo">بازگرداندن</string>
     <string name="today_empty_body">اولین کار امروز را از بالا اضافه کنید.</string>

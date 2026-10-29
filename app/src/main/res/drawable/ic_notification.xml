@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Status-bar icon for the daily reminder: the Trackora "T" from the launcher
+    mark, as a single-colour silhouette. The system tints status-bar icons
+    itself, so only the shape matters, and the brand mark is the shape a user
+    already recognises as this app.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="1024"
+    android:viewportHeight="1024">
+    <group
+        android:pivotX="512"
+        android:pivotY="512"
+        android:scaleX="1.25"
+        android:scaleY="1.25">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M252,260h520v80h-520z M462,340h120v420h-120z M292,420h120v260h-120z M622,400h120v300h-120z" />
+    </group>
+</vector>

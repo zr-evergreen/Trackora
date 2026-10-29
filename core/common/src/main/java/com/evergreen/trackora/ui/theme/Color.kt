@@ -3,86 +3,94 @@ package com.evergreen.trackora.ui.theme
 import androidx.compose.ui.graphics.Color
 
 /**
- * Professional, modern Material 3 color palette for Trackora.
+ * Trackora's palette: a workshop ledger.
  *
- * Design goals:
- * - Modern, trustworthy blue primary color with excellent contrast
- * - Soft, comfortable backgrounds that reduce eye strain
- * - High accessibility (WCAG AA+ compliant)
- * - Clear visual hierarchy and status indicators
- * - Professional appearance suitable for business use
+ * The app replaces a paper notebook, so the neutrals are warm paper rather
+ * than cold slate, and the dark theme is ink rather than navy. Three hues
+ * carry meaning and nothing else gets colour:
+ *
+ *  - **Ink indigo** (primary) — the app's own actions and selection. It stays
+ *    in the family of the blue launcher mark so the icon and the app read as
+ *    one thing.
+ *  - **Saffron** (tertiary) — finished work still waiting for its customer.
+ *    That gap is where a pieceworker loses money, so it gets the one warm,
+ *    attention-holding colour.
+ *  - **Turquoise** (secondary) — delivered, done. Calm and closed.
+ *
+ * Saffron and turquoise are the two colours most associated with Persian
+ * craft — the spice and the tilework — which gives the app a quiet identity
+ * of its own without any ornament.
+ *
+ * Every text/background pair used by the app clears WCAG AA (4.5:1) in both
+ * themes; the lowest is 6.1:1, saffron text on the light background.
+ *
+ * Every Material 3 role is defined, including the surface-container ladder.
+ * Left unset, those fall back to the baseline purple-tinted defaults, which
+ * is why some surfaces used to look faintly lilac.
  */
 
-// Primary actions – modern professional blue
-val PrimaryLight = Color(0xFF2563EB)          // Modern blue-600, vibrant yet professional
-val OnPrimaryLight = Color(0xFFFFFFFF)        // Pure white for maximum contrast
-val PrimaryContainerLight = Color(0xFFDBEAFE) // Light blue container
-val OnPrimaryContainerLight = Color(0xFF1E3A8A) // Dark blue text on container
+// ---- Light ----------------------------------------------------------------
 
-val PrimaryDark = Color(0xFF93C5FD)          // Light blue for dark theme
-val OnPrimaryDark = Color(0xFF1E3A8A)         // Dark blue text
-val PrimaryContainerDark = Color(0xFF1E40AF)  // Dark blue container
-val OnPrimaryContainerDark = Color(0xFFDBEAFE) // Light text on container
+internal val InkIndigo = Color(0xFF2B4ACB)
+internal val InkIndigoContainer = Color(0xFFDEE3FF)
+internal val OnInkIndigoContainer = Color(0xFF102A8C)
 
-// Secondary actions – sophisticated teal
-val SecondaryLight = Color(0xFF0D9488)        // Modern teal-600
-val OnSecondaryLight = Color(0xFFFFFFFF)
-val SecondaryContainerLight = Color(0xFFCCFBF1) // Light teal container
-val OnSecondaryContainerLight = Color(0xFF134E4A) // Dark teal text
+internal val Turquoise = Color(0xFF00696A)
+internal val TurquoiseContainer = Color(0xFFC4EDE9)
+internal val OnTurquoiseContainer = Color(0xFF00403F)
 
-val SecondaryDark = Color(0xFF5EEAD4)        // Light teal for dark theme
-val OnSecondaryDark = Color(0xFF134E4A)
-val SecondaryContainerDark = Color(0xFF0F766E) // Dark teal container
-val OnSecondaryContainerDark = Color(0xFFCCFBF1)
+internal val Saffron = Color(0xFF8A5000)
+internal val SaffronContainer = Color(0xFFFFE0B5)
+internal val OnSaffronContainer = Color(0xFF4A2900)
 
-// Tertiary – warm accent for highlights and emphasis
-val TertiaryLight = Color(0xFFF59E0B)        // Amber-500 for warmth
-val OnTertiaryLight = Color(0xFFFFFFFF)
-val TertiaryContainerLight = Color(0xFFFEF3C7) // Light amber container
-val OnTertiaryContainerLight = Color(0xFF78350F) // Dark amber text
+internal val Paper = Color(0xFFFAF8F5)
+internal val PaperInk = Color(0xFF1C1B1F)
+internal val PaperInkVariant = Color(0xFF4B4950)
+internal val PaperVariant = Color(0xFFE7E3DC)
+internal val PaperContainerLowest = Color(0xFFFFFFFF)
+internal val PaperContainerLow = Color(0xFFF5F2EE)
+internal val PaperContainer = Color(0xFFEFECE7)
+internal val PaperContainerHigh = Color(0xFFE9E6E1)
+internal val PaperContainerHighest = Color(0xFFE3E0DB)
+internal val PaperDim = Color(0xFFDCD9D4)
+internal val PaperOutline = Color(0xFF7B7881)
+internal val PaperOutlineVariant = Color(0xFFD3CEC7)
 
-val TertiaryDark = Color(0xFFFCD34D)         // Light amber for dark theme
-val OnTertiaryDark = Color(0xFF78350F)
-val TertiaryContainerDark = Color(0xFFD97706)  // Dark amber container
-val OnTertiaryContainerDark = Color(0xFFFEF3C7)
+internal val ErrorRed = Color(0xFFBA1A1A)
+internal val ErrorRedContainer = Color(0xFFFFDAD6)
+internal val OnErrorRedContainer = Color(0xFF7D0E0E)
 
-// Neutrals – comfortable, easy on the eyes
-val BackgroundLight = Color(0xFFF8FAFC)       // Very light gray-blue (slate-50)
-val SurfaceLight = Color(0xFFFFFFFF)          // Pure white for cards
-val SurfaceVariantLight = Color(0xFFF1F5F9)    // Slightly darker for subtle elevation
-val OnBackgroundLight = Color(0xFF0F172A)      // Dark slate for text
-val OnSurfaceLight = Color(0xFF1E293B)         // Slightly lighter for surface text
-val OnSurfaceVariantLight = Color(0xFF475569)  // Medium gray for secondary text
+// ---- Dark -----------------------------------------------------------------
 
-// Dark theme – warm, comfortable dark tones
-val BackgroundDark = Color(0xFF0F172A)        // Dark slate-900
-val SurfaceDark = Color(0xFF1E293B)           // Slate-800 for cards
-val SurfaceVariantDark = Color(0xFF334155)     // Slate-700 for elevated surfaces
-val OnBackgroundDark = Color(0xFFF1F5F9)      // Light slate for text
-val OnSurfaceDark = Color(0xFFF8FAFC)         // Very light for surface text
-val OnSurfaceVariantDark = Color(0xFFCBD5E1)   // Medium light for secondary text
+internal val InkIndigoDark = Color(0xFFB9C3FF)
+internal val OnInkIndigoDark = Color(0xFF0F2786)
+internal val InkIndigoContainerDark = Color(0xFF2B419F)
+internal val OnInkIndigoContainerDark = Color(0xFFDEE3FF)
 
-// Outline / dividers – subtle but visible
-val OutlineLight = Color(0xFFE2E8F0)          // Light slate border
-val OutlineVariantLight = Color(0xFFF1F5F9)   // Very light for subtle dividers
-val OutlineDark = Color(0xFF475569)          // Medium slate for dark theme
-val OutlineVariantDark = Color(0xFF334155)    // Darker for subtle dividers
+internal val TurquoiseDark = Color(0xFF7FD6D0)
+internal val OnTurquoiseDark = Color(0xFF003735)
+internal val TurquoiseContainerDark = Color(0xFF00504E)
+internal val OnTurquoiseContainerDark = Color(0xFFA2F2EC)
 
-// Error colors – clear and accessible
-val ErrorLight = Color(0xFFDC2626)            // Red-600
-val OnErrorLight = Color(0xFFFFFFFF)
-val ErrorContainerLight = Color(0xFFFEE2E2)   // Light red container
-val OnErrorContainerLight = Color(0xFF991B1B) // Dark red text
+internal val SaffronDark = Color(0xFFFFB866)
+internal val OnSaffronDark = Color(0xFF4A2800)
+internal val SaffronContainerDark = Color(0xFF6A3C00)
+internal val OnSaffronContainerDark = Color(0xFFFFDDB5)
 
-val ErrorDark = Color(0xFFEF4444)            // Red-500 for dark theme
-val OnErrorDark = Color(0xFFFFFFFF)
-val ErrorContainerDark = Color(0xFF991B1B)
-val OnErrorContainerDark = Color(0xFFFEE2E2)
+internal val Ink = Color(0xFF131317)
+internal val InkText = Color(0xFFE5E1E6)
+internal val InkTextVariant = Color(0xFFC8C5D0)
+internal val InkVariant = Color(0xFF47464F)
+internal val InkContainerLowest = Color(0xFF0E0E12)
+internal val InkContainerLow = Color(0xFF1B1B20)
+internal val InkContainer = Color(0xFF1F1F24)
+internal val InkContainerHigh = Color(0xFF2A292F)
+internal val InkContainerHighest = Color(0xFF35343A)
+internal val InkBright = Color(0xFF3A383E)
+internal val InkOutline = Color(0xFF928F9A)
+internal val InkOutlineVariant = Color(0xFF47464F)
 
-// Status colors – clear, professional indicators
-val StatusInProgress = Color(0xFF3B82F6)     // Blue-500: active, in progress
-val StatusCompleted = Color(0xFF10B981)      // Green-500: success, completed
-val StatusDelivered = Color(0xFF0D9488)      // Teal-600: delivered, confirmed
-val StatusWarning = Color(0xFFF59E0B)        // Amber-500: warning, attention needed
-val StatusError = Color(0xFFDC2626)          // Red-600: error, failed
-
+internal val ErrorRedDark = Color(0xFFFFB4AB)
+internal val OnErrorRedDark = Color(0xFF690005)
+internal val ErrorRedContainerDark = Color(0xFF93000A)
+internal val OnErrorRedContainerDark = Color(0xFFFFDAD6)

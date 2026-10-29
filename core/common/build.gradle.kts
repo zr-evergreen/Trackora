@@ -37,6 +37,13 @@ android {
     kotlinOptions {
         jvmTarget = "11"
     }
+
+    testOptions {
+        // The instrumented-test APK otherwise targets minSdk, and Play Protect
+        // refuses to install apps that old on a real phone.
+        targetSdk = 36
+    }
+
     buildFeatures {
         compose = true
     }
@@ -76,5 +83,9 @@ dependencies {
     
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(platform(libs.compose.bom))
+    androidTestImplementation(libs.compose.ui.test.junit4)
+    androidTestImplementation(libs.compose.ui.test.manifest)
 }
 

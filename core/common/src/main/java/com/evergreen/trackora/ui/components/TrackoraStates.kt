@@ -1,49 +1,77 @@
 package com.evergreen.trackora.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.evergreen.trackora.ui.theme.TrackoraIcons
+import com.evergreen.trackora.ui.theme.TrackoraMotion
+import kotlinx.coroutines.delay
 
 /**
  * The three states every list screen can be in, as shared components.
- *
- * They exist as one set because the app previously had none of them
- * consistently: the Today screen hand-rolled an empty state, All Work showed a
- * bare sentence, Reports showed a card of zeros, and an error on any of the
- * three was indistinguishable from having no work — the spinner simply never
- * resolved.
  *
  * All three centre in whatever space they are given and wrap their text, so
  * they survive long Persian strings and large font scales without the caller
  * doing anything.
  */
 
-/** Work is being loaded. Deliberately plain — a spinner is not a place for personality. */
+/**
+ * Work is being loaded.
+ *
+ * The spinner waits a beat before appearing: the database usually answers in
+ * a few milliseconds, and a spinner that flashes for one frame reads as
+ * flicker rather than progress.
+ */
 @Composable
 fun TrackoraLoadingState(modifier: Modifier = Modifier) {
-    Column(
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(LOADING_GRACE_MS)
+        visible = true
+    }
+    Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+            .padding(vertical = 48.dp),
+        contentAlignment = Alignment.Center
     ) {
-        CircularProgressIndicator()
+        AnimatedVisibility(visible = visible, enter = fadeIn(tween(TrackoraMotion.MEDIUM))) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(32.dp),
+                strokeWidth = 3.dp,
+                strokeCap = StrokeCap.Round
+            )
+        }
     }
 }
 
@@ -53,8 +81,8 @@ fun TrackoraLoadingState(modifier: Modifier = Modifier) {
  * @param title what is absent, stated plainly.
  * @param body what the user can do about it. Optional — some empty states are
  *   simply a fact and inventing an instruction for them adds noise.
- * @param icon decorative; hidden from screen readers because [title] already
- *   says everything it conveys.
+ * @param icon decorative; screen readers get [title], which says everything
+ *   the picture does.
  */
 @Composable
 fun TrackoraEmptyState(
@@ -63,31 +91,26 @@ fun TrackoraEmptyState(
     body: String? = null,
     icon: ImageVector? = null,
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 32.dp, vertical = 40.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
+    StateLayout(modifier) {
         if (icon != null) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .size(40.dp)
-                    .clearAndSetSemantics { }
+            IconTile(
+                icon = icon,
+                container = MaterialTheme.colorScheme.surfaceContainerHigh,
+                content = MaterialTheme.colorScheme.onSurfaceVariant,
+                size = 64.dp,
+                shape = CircleShape
             )
-            Spacer(12.dp)
+            Spacer(modifier = Modifier.size(16.dp))
         }
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center
         )
         if (body != null) {
-            Spacer(6.dp)
+            Spacer(modifier = Modifier.size(4.dp))
             Text(
                 text = body,
                 style = MaterialTheme.typography.bodyMedium,
@@ -116,33 +139,64 @@ fun TrackoraErrorState(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 32.dp, vertical = 40.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
+    StateLayout(modifier) {
+        IconTile(
+            icon = TrackoraIcons.Error,
+            container = MaterialTheme.colorScheme.errorContainer,
+            content = MaterialTheme.colorScheme.onErrorContainer,
+            size = 64.dp,
+            shape = CircleShape
+        )
+        Spacer(modifier = Modifier.size(16.dp))
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center
         )
-        Spacer(6.dp)
+        Spacer(modifier = Modifier.size(4.dp))
         Text(
             text = message,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
-        Spacer(16.dp)
-        OutlinedButton(onClick = onRetry) {
+        Spacer(modifier = Modifier.size(20.dp))
+        FilledTonalButton(onClick = onRetry) {
+            Icon(
+                imageVector = TrackoraIcons.Retry,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
             Text(text = retryLabel)
         }
     }
 }
 
+/** Centres a state and lets it rise into place instead of popping in. */
 @Composable
-private fun Spacer(height: androidx.compose.ui.unit.Dp) {
-    androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(height))
+private fun StateLayout(
+    modifier: Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val appear = remember { MutableTransitionState(false).apply { targetState = true } }
+    AnimatedVisibility(
+        visibleState = appear,
+        enter = fadeIn(tween(TrackoraMotion.MEDIUM)) +
+            slideInVertically(tween(TrackoraMotion.MEDIUM, easing = TrackoraMotion.EmphasizedDecelerate)) { it / 12 },
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 32.dp, vertical = 40.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            content = content
+        )
+    }
 }
+
+private const val LOADING_GRACE_MS = 300L

@@ -1,9 +1,14 @@
 package com.evergreen.trackora.feature.allwork
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,62 +18,74 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
-import androidx.compose.material3.rememberSwipeToDismissBoxState
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalTextStyle
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import com.evergreen.trackora.common.R as CommonR
 import com.evergreen.trackora.domain.model.Status
 import com.evergreen.trackora.domain.model.WorkEntry
+import com.evergreen.trackora.ui.components.CountPill
+import com.evergreen.trackora.ui.components.ScreenHeader
 import com.evergreen.trackora.ui.components.TrackoraEmptyState
 import com.evergreen.trackora.ui.components.TrackoraErrorState
 import com.evergreen.trackora.ui.components.TrackoraFilterChip
 import com.evergreen.trackora.ui.components.TrackoraFilterRow
 import com.evergreen.trackora.ui.components.TrackoraLoadingState
-import com.evergreen.trackora.ui.components.TrackoraScreenContainer
 import com.evergreen.trackora.ui.components.WorkEntryRow
-import com.evergreen.trackora.ui.text.localizedDate
-import com.evergreen.trackora.ui.text.localizedNumber
-import java.time.LocalDate
+import com.evergreen.trackora.ui.components.trackoraTextFieldColors
 import com.evergreen.trackora.ui.text.forUserContent
+import com.evergreen.trackora.ui.text.localizedDate
+import com.evergreen.trackora.ui.theme.TrackoraIcons
+import com.evergreen.trackora.ui.theme.TrackoraMotion
+import com.evergreen.trackora.ui.theme.TrackoraSpacing
+import com.evergreen.trackora.ui.theme.cardContainer
+import com.evergreen.trackora.ui.theme.container
+import com.evergreen.trackora.ui.theme.content
+import com.evergreen.trackora.ui.theme.statusColors
+import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 
 /**
  * Screen for viewing all work entries with quick status filters.
+ *
+ * The history reads as a ledger: one heading per day that stays pinned while
+ * that day's entries scroll beneath it, so a long list never loses track of
+ * which day the user is looking at.
  */
 @Composable
 fun AllWorkScreen(
-    contentPadding: androidx.compose.foundation.layout.PaddingValues,
+    contentPadding: PaddingValues,
     onEntryClick: (Long) -> Unit,
     viewModel: AllWorkViewModel,
     initialStatus: Status? = null,
@@ -124,94 +141,127 @@ fun AllWorkScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-    TrackoraScreenContainer(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(contentPadding)
-    ) {
-        Text(
-            text = stringResource(id = R.string.all_work_title),
-            style = MaterialTheme.typography.titleLarge
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        SearchField(
-            query = uiState.query,
-            onQueryChange = viewModel::setQuery,
-            onClear = viewModel::clearQuery
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        StatusFilterRow(
-            selected = uiState.filter,
-            onFilterSelected = viewModel::setFilter
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        when {
-            uiState.isLoading -> TrackoraLoadingState()
-
-            uiState.errorMessage != null -> TrackoraErrorState(
-                title = stringResource(id = com.evergreen.trackora.common.R.string.state_error_title),
-                message = stringResource(id = com.evergreen.trackora.common.R.string.state_error_body),
-                retryLabel = stringResource(id = com.evergreen.trackora.common.R.string.state_retry),
-                onRetry = viewModel::retry
-            )
-
-            // A search that matched nothing is a different situation from an
-            // empty log, and telling them apart is the difference between
-            // "try another word" and "add your first job".
-            uiState.hasNoMatches -> TrackoraEmptyState(
-                title = stringResource(id = R.string.search_no_results_title),
-                body = stringResource(id = R.string.search_no_results_body)
-            )
-
-            uiState.filteredEntries.isEmpty() -> TrackoraEmptyState(
-                title = stringResource(id = R.string.empty_all_work)
-            )
-
-            else -> {
-                val listState = rememberLazyListState()
-                // Same reason as on Today: a lazy list holds its first visible
-                // item in place by key, so undoing the delete of the newest
-                // day's only entry restored its section above the viewport and
-                // Undo looked as if it had done nothing. A list at the top
-                // stays at the top; one scrolled down keeps its place.
-                val atTop by remember {
-                    derivedStateOf {
-                        listState.firstVisibleItemIndex == 0 &&
-                            listState.firstVisibleItemScrollOffset == 0
-                    }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(contentPadding)
+        ) {
+            val showCount = !uiState.isLoading && uiState.errorMessage == null &&
+                uiState.filteredEntries.isNotEmpty()
+            ScreenHeader(
+                title = stringResource(id = R.string.all_work_title),
+                // How many entries the current search and filter leave, so
+                // narrowing the list says what it did.
+                subtitle = if (showCount) {
+                    pluralStringResource(
+                        id = R.plurals.all_work_count,
+                        count = uiState.filteredEntries.size,
+                        uiState.filteredEntries.size
+                    )
+                } else {
+                    null
                 }
-                if (atTop) listState.requestScrollToItem(0)
+            )
 
-                LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-                    uiState.sections.forEach { section ->
-                        item(key = "h-${section.date}") {
-                            DayHeader(date = section.date, count = section.entries.size)
-                        }
-                        items(items = section.entries, key = { it.id }) { entry ->
-                            SwipeableEntry(
-                                entry = entry,
-                                onClick = { onEntryClick(entry.id) },
-                                onAdvanceStatus = { viewModel.advanceStatus(entry) },
-                                onDelete = { viewModel.deleteEntry(entry) }
-                            )
-                        }
-                    }
-                }
+            SearchField(
+                query = uiState.query,
+                onQueryChange = viewModel::setQuery,
+                onClear = viewModel::clearQuery,
+                modifier = Modifier.padding(horizontal = TrackoraSpacing.screen)
+            )
+
+            Spacer(modifier = Modifier.height(TrackoraSpacing.md))
+
+            StatusFilterRow(
+                selected = uiState.filter,
+                onFilterSelected = viewModel::setFilter
+            )
+
+            Spacer(modifier = Modifier.height(TrackoraSpacing.xs))
+
+            when {
+                uiState.isLoading -> TrackoraLoadingState()
+
+                uiState.errorMessage != null -> TrackoraErrorState(
+                    title = stringResource(id = CommonR.string.state_error_title),
+                    message = stringResource(id = CommonR.string.state_error_body),
+                    retryLabel = stringResource(id = CommonR.string.state_retry),
+                    onRetry = viewModel::retry
+                )
+
+                // A search that matched nothing is a different situation from an
+                // empty log, and telling them apart is the difference between
+                // "try another word" and "add your first job".
+                uiState.hasNoMatches -> TrackoraEmptyState(
+                    title = stringResource(id = R.string.search_no_results_title),
+                    body = stringResource(id = R.string.search_no_results_body),
+                    icon = TrackoraIcons.NoResults
+                )
+
+                uiState.filteredEntries.isEmpty() -> TrackoraEmptyState(
+                    title = stringResource(id = R.string.empty_all_work),
+                    icon = TrackoraIcons.HistoryOutlined
+                )
+
+                else -> EntryList(
+                    uiState = uiState,
+                    onEntryClick = onEntryClick,
+                    onAdvanceStatus = viewModel::advanceStatus,
+                    onDelete = viewModel::deleteEntry
+                )
             }
         }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(contentPadding)
+        )
     }
-    SnackbarHost(
-        hostState = snackbarHostState,
-        modifier = Modifier
-            .align(Alignment.BottomCenter)
-            .padding(contentPadding)
-    )
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun EntryList(
+    uiState: AllWorkUiState,
+    onEntryClick: (Long) -> Unit,
+    onAdvanceStatus: (WorkEntry) -> Unit,
+    onDelete: (WorkEntry) -> Unit,
+) {
+    val listState = rememberLazyListState()
+    // Same reason as on Today: a lazy list holds its first visible item in
+    // place by key, so undoing the delete of the newest day's only entry
+    // restored its section above the viewport and Undo looked as if it had
+    // done nothing. A list at the top stays at the top; one scrolled down
+    // keeps its place.
+    val atTop by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex == 0 &&
+                listState.firstVisibleItemScrollOffset == 0
+        }
+    }
+    if (atTop) listState.requestScrollToItem(0)
+    val today = LocalDate.now()
+
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = TrackoraSpacing.xxl)
+    ) {
+        uiState.sections.forEach { section ->
+            stickyHeader(key = "h-${section.date}") {
+                DayHeader(date = section.date, today = today, count = section.entries.size)
+            }
+            items(items = section.entries, key = { it.id }) { entry ->
+                SwipeableEntry(
+                    entry = entry,
+                    onClick = { onEntryClick(entry.id) },
+                    onAdvanceStatus = { onAdvanceStatus(entry) },
+                    onDelete = { onDelete(entry) },
+                    modifier = Modifier.animateItem()
+                )
+            }
+        }
     }
 }
 
@@ -227,13 +277,18 @@ fun AllWorkScreen(
  * mean the gesture does different things depending on which way the user
  * happens to swipe, which in an app that flips between LTR and RTL is a
  * reliable way to delete something by accident.
+ *
+ * The bin sits on the side the card uncovers, and the tray beneath turns red
+ * and the bin grows once the swipe has gone far enough to count — so the
+ * point of no return is visible before the finger lifts.
  */
 @Composable
 private fun SwipeableEntry(
     entry: WorkEntry,
     onClick: () -> Unit,
     onAdvanceStatus: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
@@ -248,23 +303,49 @@ private fun SwipeableEntry(
 
     SwipeToDismissBox(
         state = dismissState,
+        // The card's inset is applied to the whole box, so the tray behind
+        // it is exactly the card's size and never shows as a sliver at rest.
+        modifier = modifier.padding(horizontal = TrackoraSpacing.screen, vertical = TrackoraSpacing.xs),
         backgroundContent = {
+            val armed = dismissState.targetValue != SwipeToDismissBoxValue.Settled
+            val trayColor by animateColorAsState(
+                targetValue = if (armed) {
+                    MaterialTheme.colorScheme.errorContainer
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainerHigh
+                },
+                animationSpec = tween(TrackoraMotion.SHORT),
+                label = "deleteTray"
+            )
+            val binScale by animateFloatAsState(
+                targetValue = if (armed) 1.15f else 0.9f,
+                animationSpec = tween(TrackoraMotion.SHORT),
+                label = "deleteBin"
+            )
+            val binColor = if (armed) {
+                MaterialTheme.colorScheme.onErrorContainer
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            }
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    // Must match WorkEntryRow's own card padding exactly, or
-                    // the background shows as a permanent coloured sliver down
-                    // both edges of every row instead of appearing on swipe.
-                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                    .fillMaxSize()
                     .clip(MaterialTheme.shapes.medium)
-                    .background(MaterialTheme.colorScheme.errorContainer)
-                    .padding(horizontal = 24.dp),
-                contentAlignment = Alignment.Center
+                    .background(trayColor)
+                    .padding(horizontal = TrackoraSpacing.xxl),
+                // Start and End follow the layout direction, so the bin is on
+                // the uncovered side in Persian as well as English.
+                contentAlignment = if (dismissState.dismissDirection == SwipeToDismissBoxValue.StartToEnd) {
+                    Alignment.CenterStart
+                } else {
+                    Alignment.CenterEnd
+                }
             ) {
                 Icon(
-                    imageVector = Icons.Default.Delete,
+                    imageVector = TrackoraIcons.Delete,
                     contentDescription = stringResource(id = R.string.delete_entry),
-                    tint = MaterialTheme.colorScheme.onErrorContainer
+                    tint = binColor,
+                    modifier = Modifier.scale(binScale)
                 )
             }
         }
@@ -285,19 +366,25 @@ private fun StatusFilterRow(
     selected: Status?,
     onFilterSelected: (Status?) -> Unit
 ) {
-    val filters: List<Pair<String, Status?>> = listOf(
-        stringResource(id = R.string.filter_all) to null,
-        stringResource(id = R.string.filter_in_progress) to Status.IN_PROGRESS,
-        stringResource(id = R.string.filter_completed) to Status.COMPLETED,
-        stringResource(id = R.string.filter_delivered) to Status.DELIVERED
-    )
-
-    TrackoraFilterRow {
-        filters.forEach { (label, status) ->
+    val statusColors = MaterialTheme.statusColors
+    TrackoraFilterRow(contentPadding = PaddingValues(horizontal = TrackoraSpacing.screen)) {
+        TrackoraFilterChip(
+            label = stringResource(id = R.string.filter_all),
+            selected = selected == null,
+            onClick = { onFilterSelected(null) }
+        )
+        listOf(
+            Status.IN_PROGRESS to R.string.filter_in_progress,
+            Status.COMPLETED to R.string.filter_completed,
+            Status.DELIVERED to R.string.filter_delivered
+        ).forEach { (status, label) ->
             TrackoraFilterChip(
-                label = label,
+                label = stringResource(id = label),
                 selected = selected == status,
-                onClick = { onFilterSelected(status) }
+                onClick = { onFilterSelected(status) },
+                icon = TrackoraIcons.forStatus(status),
+                selectedContainerColor = statusColors.container(status),
+                selectedContentColor = statusColors.content(status)
             )
         }
     }
@@ -320,15 +407,16 @@ private fun SearchField(
     query: String,
     onQueryChange: (String) -> Unit,
     onClear: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     OutlinedTextField(
         value = query,
         onValueChange = onQueryChange,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         placeholder = { Text(text = stringResource(id = R.string.search_hint)) },
         leadingIcon = {
             Icon(
-                imageVector = Icons.Default.Search,
+                imageVector = TrackoraIcons.Search,
                 contentDescription = null
             )
         },
@@ -338,7 +426,7 @@ private fun SearchField(
             if (query.isNotEmpty()) {
                 IconButton(onClick = onClear) {
                     Icon(
-                        imageVector = Icons.Default.Close,
+                        imageVector = TrackoraIcons.Clear,
                         contentDescription = stringResource(id = R.string.search_clear)
                     )
                 }
@@ -349,30 +437,48 @@ private fun SearchField(
         // resolves its own direction rather than inheriting the layout's.
         textStyle = LocalTextStyle.current.forUserContent(),
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-        shape = MaterialTheme.shapes.medium
+        shape = MaterialTheme.shapes.extraLarge,
+        colors = trackoraTextFieldColors(container = MaterialTheme.colorScheme.cardContainer)
     )
 }
 
-/** Date heading for one day's work, with how many entries it holds. */
+/**
+ * Date heading for one day's work, with how many entries it holds.
+ *
+ * Pinned while its day scrolls, so it has the page's own background to hide
+ * the cards passing under it. The two most recent days read as words, with
+ * the date beside them, because "Yesterday" is what the user is looking for.
+ */
 @Composable
-private fun DayHeader(date: LocalDate, count: Int) {
+private fun DayHeader(date: LocalDate, today: LocalDate, count: Int) {
+    val relative = when (ChronoUnit.DAYS.between(date, today)) {
+        0L -> stringResource(id = CommonR.string.date_today)
+        1L -> stringResource(id = CommonR.string.date_yesterday)
+        else -> null
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+            .background(MaterialTheme.colorScheme.background)
+            .padding(start = TrackoraSpacing.screen, end = TrackoraSpacing.screen, top = 14.dp, bottom = 6.dp)
+            .semantics(mergeDescendants = true) { heading() },
+        horizontalArrangement = Arrangement.spacedBy(TrackoraSpacing.sm),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = localizedDate(date),
+            text = relative ?: localizedDate(date, includeWeekday = true),
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface
         )
-        Text(
-            text = localizedNumber(count),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        if (relative != null) {
+            Text(
+                text = localizedDate(date),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(modifier = Modifier.weight(1f))
+        CountPill(count = count, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

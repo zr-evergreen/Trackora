@@ -14,6 +14,10 @@
     <string name="search_clear">Clear search</string>
     <string name="search_no_results_title">No matching work</string>
     <string name="search_no_results_body">Try a different word, or clear the filters.</string>
-    <string name="all_work_count">%1$d entries</string>
+    <!-- How many entries the current search and filter leave, under the title. -->
+    <plurals name="all_work_count">
+        <item quantity="one">%1$d entry</item>
+        <item quantity="other">%1$d entries</item>
+    </plurals>
 </resources>
 

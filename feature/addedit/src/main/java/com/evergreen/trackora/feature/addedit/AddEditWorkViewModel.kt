@@ -184,6 +184,27 @@ class AddEditWorkViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Abandons a gallery copy still in progress and leaves the photo as it was
+     * before the pick. A copy from a slow or offline provider can take as long
+     * as the provider likes; this frees Save without throwing away the form.
+     */
+    fun cancelPhotoImport() {
+        photoImportJob?.cancel()
+        photoImportJob = null
+        _uiState.update { it.copy(isImportingPhoto = false) }
+    }
+
+    /**
+     * Attaches a photo just taken with the camera. A gallery copy still in
+     * progress is abandoned first, or it would replace this photo when it
+     * finished.
+     */
+    fun onCameraPhotoTaken(uri: String) {
+        cancelPhotoImport()
+        onPhotoSelected(uri)
+    }
+
     fun clearPhoto() {
         _uiState.update {
             it.copy(

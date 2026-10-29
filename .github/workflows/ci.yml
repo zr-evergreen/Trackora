@@ -96,18 +96,19 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      # API 24 specifically, not the newest available: these tests exist to
+      # API 24 specifically, not the newest available: the DAO tests exist to
       # prove java.time still resolves through core library desugaring on the
       # oldest supported release. Running them on API 34 would pass no matter
-      # what, because there java.time is in the platform.
-      - name: Run DAO tests on API 24
+      # what, because there java.time is in the platform. The Compose tests for
+      # the shared cards, the entry form and Today run on the same release.
+      - name: Run instrumented tests on API 24
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 24
           target: default
           arch: x86_64
           disable-animations: true
-          script: ./gradlew :core:data:connectedDebugAndroidTest --stacktrace
+          script: ./gradlew :core:data:connectedDebugAndroidTest :core:common:connectedDebugAndroidTest :feature:addedit:connectedDebugAndroidTest :feature:today:connectedDebugAndroidTest --stacktrace
 
       - name: Upload instrumentation reports
         if: always()

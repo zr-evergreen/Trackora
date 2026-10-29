@@ -1,7 +1,12 @@
 package com.evergreen.trackora.ui.text
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.unit.LayoutDirection
 
 /**
  * Marks a style as carrying text the user typed, whose language the app does
@@ -26,3 +31,20 @@ import androidx.compose.ui.text.style.TextDirection
  */
 fun TextStyle.forUserContent(): TextStyle =
     copy(textDirection = TextDirection.Content)
+
+/**
+ * Alignment that puts user content against the layout's start edge, whatever
+ * its own direction.
+ *
+ * [forUserContent] decides how a title's characters are ordered; this decides
+ * which edge the line sits against, and the two are separate questions. Left
+ * to its own direction, a Latin title in the Persian build sat against the
+ * left edge, beside the action button, while Persian titles sat on the right,
+ * so a list of mixed titles had no common edge to read down. Aligned to the
+ * layout, every title starts at the same edge as the rest of the card, and
+ * each one is still ordered correctly within its line.
+ */
+@Composable
+@ReadOnlyComposable
+fun layoutStartAlign(): TextAlign =
+    if (LocalLayoutDirection.current == LayoutDirection.Rtl) TextAlign.Right else TextAlign.Left
