@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="reports_title">گزارش‌ها</string>
     <string name="reports_empty_title">هنوز چیزی ثبت نشده</string>
     <string name="reports_empty_body">کارهایی که ثبت کنید اینجا خلاصه می‌شود.</string>
@@ -11,12 +11,14 @@
     <string name="reports_period_monthly">۳۰ روز گذشته</string>
     <string name="reports_period_with_dates">%1$s، %2$s</string>
 
-    <!-- عددهای اصلی: عدد جدا و درشت نوشته می‌شود؛ این‌ها واژه‌های پس از آن‌اند. -->
-    <plurals name="reports_jobs_finished">
+    <!-- عددهای اصلی: عدد جدا و درشت نوشته می‌شود؛ این‌ها واژه‌های پس از آن‌اند.
+         The number is drawn on its own line above these labels, so the same
+         words are right for 0 and 1, which Persian's "one" covers together. -->
+    <plurals name="reports_jobs_finished" tools:ignore="ImpliedQuantity">
         <item quantity="one">کار تمام‌شده</item>
         <item quantity="other">کار تمام‌شده</item>
     </plurals>
-    <plurals name="reports_items_made">
+    <plurals name="reports_items_made" tools:ignore="ImpliedQuantity">
         <item quantity="one">عدد</item>
         <item quantity="other">عدد</item>
     </plurals>
