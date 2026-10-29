@@ -56,6 +56,23 @@
                 android:resource="@xml/file_provider_paths" />
         </provider>
 
+        <!--
+            Lets AppCompat keep the chosen app language itself and apply it
+            before the first frame on Android 12 and earlier. Without it the
+            language was only applied after the activity had started, so a
+            cold start drew the screen in the phone's language, went black
+            while the activity was recreated, then drew it again in the
+            chosen one. Android 13 and later keep per-app languages natively.
+        -->
+        <service
+            android:name="androidx.appcompat.app.AppLocalesMetadataHolderService"
+            android:enabled="false"
+            android:exported="false">
+            <meta-data
+                android:name="autoStoreLocales"
+                android:value="true" />
+        </service>
+
         <!-- Disable WorkManager auto-initialization to use Hilt -->
         <provider
             android:name="androidx.startup.InitializationProvider"
