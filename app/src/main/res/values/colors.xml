@@ -17,12 +17,9 @@
 
     <!--
         The splash screen: the app's own background, so the splash hands over
-        to the first screen without a change of colour, and the mark in ink
-        indigo with a saffron thread. The thread is a deeper saffron than the
-        icon's, which is drawn for indigo and would wash out on paper. The
-        night values are in values-night/colors.xml.
+        to the first screen without a change of colour, and the seal in the
+        app's primary. The night values are in values-night/colors.xml.
     -->
     <color name="splash_background">#FAF8F5</color>
     <color name="splash_mark">#2B4ACB</color>
-    <color name="splash_thread">#F0961C</color>
 </resources>

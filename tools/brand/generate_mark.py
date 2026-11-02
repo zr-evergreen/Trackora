@@ -1,151 +1,156 @@
 #!/usr/bin/env python3
-"""Generates Trackora's launcher icon, themed icon, splash mark and
-notification icon from one description of the mark.
+"""Generates Trackora's launcher icon, themed icon, notification icon and
+splash from one description of the mark.
 
-The mark: three upright marks — a job's three stages — and a saffron thread
-rising through them, over the first, under the second, over the third. A
-tally from the paper notebook the app replaces, woven like the cloth of the
-workshops it is made for.
+The mark, the Trackora seal: a disc, one whole job, cut by the T of Trackora
+into three parts, the three stages a job goes through. Where the T's bar
+crosses the stem it steps up a level: the work moving up a stage.
 
-All geometry lives here, in the 108-unit adaptive-icon canvas, and every
-asset is written from it, so they cannot drift apart. Run from anywhere:
+All geometry lives here and every asset is written from it, so they cannot
+drift apart. Run from anywhere, with nothing but Python 3:
 
     python3 tools/brand/generate_mark.py            # drawables and legacy PNGs
     python3 tools/brand/generate_mark.py --no-png   # drawables only
 
-The legacy PNGs (Android 7.x) are rendered with headless Chrome.
+The legacy PNGs (Android 7.x) are rasterised here too, from the same outlines
+the vector drawables are drawn with.
 """
 import argparse
 import math
 import os
 import re
-import subprocess
-import tempfile
+import struct
+import zlib
+
 
 def f(v):
     s = f"{v:.2f}".rstrip('0').rstrip('.')
     return '0' if s in ('-0', '') else s
 
 # ---- Geometry --------------------------------------------------------------
+#
+# In units of the seal's radius, centred on the origin, y down as on screen.
+# The T is a gutter cut out of the disc:
+#  - the bar's cut is a little narrower than the stem's, because a horizontal
+#    gap looks heavier than a vertical one of the same width;
+#  - both stay open at 16 px, where the stem's cut is still 1.7 px wide;
+#  - the bar steps up across the stem by exactly the stem's cut, so one 45°
+#    line joins the two lower parts' top corners, and the top part's edge runs
+#    parallel to it one cut away. Every edge is level, upright or at 45°, and
+#    those stay crisp on the pixel grid at sizes where a tilted bar blurs.
 
-SCALE = 0.86            # fits the whole mark, caps included, in the 33-unit safe radius
-C = 54.0
+BAR_CUT = 0.21                  # the bar's gutter, top to bottom
+STEM_CUT = 0.24                 # the stem's gutter, side to side
+BAR = -0.30                     # the bar's centre line where it crosses the stem
+LEFT = BAR + STEM_CUT / 2       # the bar's centre line left of the stem …
+RIGHT = BAR - STEM_CUT / 2      # … and right of it, one stem cut higher
+# Where the top part's edge turns up through the step: set back from the stem
+# so that the gutter keeps its width on the diagonal too.
+SET_BACK = BAR_CUT * (math.sqrt(2) - 1)
+STEP_FROM, STEP_TO = -STEM_CUT / 2 - SET_BACK, STEM_CUT / 2 - SET_BACK
 
-def sc(x, y):
-    return (C + (x - C) * SCALE, C + (y - C) * SCALE)
+FAR = 1.5                       # anywhere outside the disc
+# Each part is the disc clipped to one of these regions, all clockwise on screen.
+REGIONS = {
+    "top": [(-FAR, -FAR), (FAR, -FAR), (FAR, RIGHT - BAR_CUT / 2), (STEP_TO, RIGHT - BAR_CUT / 2),
+            (STEP_FROM, LEFT - BAR_CUT / 2), (-FAR, LEFT - BAR_CUT / 2)],
+    "lower_left": [(-FAR, LEFT + BAR_CUT / 2), (-STEM_CUT / 2, LEFT + BAR_CUT / 2),
+                   (-STEM_CUT / 2, FAR), (-FAR, FAR)],
+    "lower_right": [(STEM_CUT / 2, RIGHT + BAR_CUT / 2), (FAR, RIGHT + BAR_CUT / 2),
+                    (FAR, FAR), (STEM_CUT / 2, FAR)],
+}
 
-BAR_X = [41.0, 54.0, 67.0]
-BAR_TOP, BAR_BOTTOM = 36.0, 72.0
-BAR_W = 9.5
-THREAD = [(28.0, 70.0), (45.0, 65.0), (63.0, 55.0), (80.0, 35.0)]   # cubic Bézier
-THREAD_W = 9.0
-EDGE = 2.4              # the ink edge that separates a crossing from what lies beneath
-UNDER = {1}             # the thread passes under the second mark
+def _crossings(p, q):
+    """Where the segment p→q crosses the unit circle, as (t, entering) pairs."""
+    dx, dy = q[0] - p[0], q[1] - p[1]
+    a = dx * dx + dy * dy
+    b = 2 * (p[0] * dx + p[1] * dy)
+    c = p[0] ** 2 + p[1] ** 2 - 1
+    disc = b * b - 4 * a * c
+    if disc <= 0:
+        return []
+    root = math.sqrt(disc)
+    return [(t, entering) for t, entering in (((-b - root) / (2 * a), True), ((-b + root) / (2 * a), False))
+            if 0 < t < 1]
 
-bar_w = BAR_W * SCALE
-thread_w = THREAD_W * SCALE
-edge = EDGE * SCALE
-bars = []
-for x in BAR_X:
-    (cx, top) = sc(x, BAR_TOP)
-    (_, bottom) = sc(x, BAR_BOTTOM)
-    bars.append((cx, top, bottom))
-thread = [sc(*p) for p in THREAD]
+def outline(region):
+    """The region's share of the unit disc, as (point, along_circle) pairs:
+    along_circle means the point is reached round the circle from the one
+    before it, where the region's edge has left the disc."""
+    pts = []
+    for i, p in enumerate(region):
+        q = region[(i + 1) % len(region)]
+        if p[0] ** 2 + p[1] ** 2 < 1:
+            pts.append((p, False))
+        for t, entering in _crossings(p, q):
+            pts.append(((p[0] + t * (q[0] - p[0]), p[1] + t * (q[1] - p[1])), entering))
+    return pts
 
-def bar_path(cx, top, bottom, r):
-    """A vertical capsule, clockwise (in y-down screen space)."""
-    return (f"M{f(cx - r)},{f(top)} A{f(r)},{f(r)} 0 0 1 {f(cx + r)},{f(top)} "
-            f"L{f(cx + r)},{f(bottom)} A{f(r)},{f(r)} 0 0 1 {f(cx - r)},{f(bottom)} Z")
+def path_data(part, cx, cy, r):
+    """One part of the seal, of radius r centred on (cx, cy), as path data."""
+    pts = outline(REGIONS[part])
+    at = lambda p: f"{f(cx + p[0] * r)},{f(cy + p[1] * r)}"
 
-def bar_path_ccw(cx, top, bottom, r):
-    """The same capsule, counter-clockwise, to cut a hole under the non-zero rule."""
-    return (f"M{f(cx + r)},{f(top)} A{f(r)},{f(r)} 0 0 0 {f(cx - r)},{f(top)} "
-            f"L{f(cx - r)},{f(bottom)} A{f(r)},{f(r)} 0 0 0 {f(cx + r)},{f(bottom)} Z")
+    def to(prev, p, along_circle):
+        if not along_circle:
+            return "L" + at(p)
+        sweep = (math.atan2(p[1], p[0]) - math.atan2(prev[1], prev[0])) % (2 * math.pi)
+        return f"A{f(r)},{f(r)} 0 {1 if sweep > math.pi else 0} 1 {at(p)}"
 
-def thread_path():
-    (x0, y0), (x1, y1), (x2, y2), (x3, y3) = thread
-    return f"M{f(x0)},{f(y0)} C{f(x1)},{f(y1)} {f(x2)},{f(y2)} {f(x3)},{f(y3)}"
+    d = "M" + at(pts[0][0])
+    for (prev, _), (p, along_circle) in zip(pts, pts[1:]):
+        d += " " + to(prev, p, along_circle)
+    if pts[0][1]:
+        d += " " + to(pts[-1][0], pts[0][0], True)
+    return d + " Z"
 
-def bez(t):
-    (x0, y0), (x1, y1), (x2, y2), (x3, y3) = thread
-    u = 1 - t
-    x = u**3 * x0 + 3 * u * u * t * x1 + 3 * u * t * t * x2 + t**3 * x3
-    y = u**3 * y0 + 3 * u * u * t * y1 + 3 * u * t * t * y2 + t**3 * y3
-    dx = 3 * u * u * (x1 - x0) + 6 * u * t * (x2 - x1) + 3 * t * t * (x3 - x2)
-    dy = 3 * u * u * (y1 - y0) + 6 * u * t * (y2 - y1) + 3 * t * t * (y3 - y2)
-    n = math.hypot(dx, dy)
-    return x, y, dx / n, dy / n
+def part_at(x, y):
+    """The part of the unit seal that covers (x, y), or None."""
+    if x * x + y * y > 1:
+        return None
+    for part, region in REGIONS.items():
+        inside = False
+        for (x1, y1), (x2, y2) in zip(region, region[1:] + region[:1]):
+            if (y1 > y) != (y2 > y) and x < x1 + (y - y1) * (x2 - x1) / (y2 - y1):
+                inside = not inside
+        if inside:
+            return part
+    return None
 
-def band_polygon(half, steps=48):
-    """The thread widened to `half` on each side, as a closed polygon.
-    Returned counter-clockwise so that, inside a clockwise frame, it cuts a hole."""
-    left, right = [], []
-    for i in range(steps + 1):
-        x, y, tx, ty = bez(i / steps)
-        nx, ny = -ty, tx
-        left.append((x + nx * half, y + ny * half))
-        right.append((x - nx * half, y - ny * half))
-    # Round each end with a half-circle of points: at the far end from the
-    # left edge round the tip to the right edge, at the near end from the
-    # right edge round the back to the left edge.
-    def cap(t, start_angle):
-        x, y, tx, ty = bez(t)
-        base = math.atan2(ty, tx)
-        return [(x + math.cos(base + start_angle - math.pi * k / 12) * half,
-                 y + math.sin(base + start_angle - math.pi * k / 12) * half) for k in range(1, 12)]
-    poly = left + cap(1, math.pi / 2) + right[::-1] + cap(0, -math.pi / 2)
-    area = sum(x1 * y2 - x2 * y1 for (x1, y1), (x2, y2) in zip(poly, poly[1:] + poly[:1])) / 2
-    # In y-down space a positive shoelace area is clockwise on screen.
-    if area > 0:
-        poly = poly[::-1]
-    return "M" + " L".join(f"{f(x)},{f(y)}" for x, y in poly) + " Z"
+# ---- Sizes, palette and motion ---------------------------------------------
 
-FRAME = "M0,0 L108,0 L108,108 L0,108 Z"     # clockwise on screen
+C = 54.0                # the centre of the 108-unit adaptive-icon canvas
+ICON_R = 21.0           # 58% of the 72 units a launcher shows; well inside the 33-unit safe zone
+# The platform draws the splash icon at 288dp for the 108-unit canvas, so the
+# seal is 128dp across: two-thirds of the 192dp circle kept clear for it.
+SPLASH_R = 24.0
+NOTIFICATION_R = 10.0   # in the 24dp notification icon: fills the 20dp live area
 
-# ---- Palette ---------------------------------------------------------------
+INDIGO = "#2B4ACB"      # InkIndigo, the app's primary
+PAPER = "#FAF8F5"       # the app's light background
 
-INK_LIGHT = "#3A5BE0"   # the background gradient, top-left …
-INK_DEEP = "#1A2A8C"    # … to bottom-right; InkIndigo (#2B4ACB) sits between
-EDGE_INK = "#1C2B8A"
-PAPER = "#FAF8F5"
-SAFFRON = "#FFB866"     # SaffronDark in the app's palette
+# The splash entrance on Android 12+. Each part fades in as it slides into
+# place from an offset, in radius units: the lower parts rise, then the top
+# part steps up along the 45° line. It travels less than one cut, so it never
+# touches the others.
+ENTRANCE = {            # part: (start ms, duration ms, from x, from y)
+    "lower_left": (0, 300, 0.0, 0.32),
+    "lower_right": (70, 300, 0.0, 0.32),
+    "top": (240, 440, -0.16, 0.16),
+}
+ENTRANCE_MS = max(start + duration for start, duration, _, _ in ENTRANCE.values())
+PART_NOTES = {
+    "top": "The top part, its edge stepping up across the stem.",
+    "lower_left": "The lower parts, either side of the stem.",
+    "lower_right": None,
+}
 
-# ---- SVG (for the legacy PNGs) ---------------------------------------------
+# ---- Android resources -------------------------------------------------------
 
-def svg_foreground(paper=PAPER, saffron=SAFFRON, edge_color=EDGE_INK, uid="f"):
-    """Full colour. The ink edge appears only where one strand crosses another,
-    like the gap in a real weave: around the thread where it lies on a mark,
-    and around the middle mark where it lies on the thread."""
-    r = bar_w / 2
-    over = [b for i, b in enumerate(bars) if i not in UNDER]
-    under = [b for i, b in enumerate(bars) if i in UNDER]
-    s = f'<defs><clipPath id="{uid}-on-bars"><path d="{" ".join(bar_path(*b, r) for b in over)}"/></clipPath>'
-    s += f'<clipPath id="{uid}-on-thread"><path d="{band_polygon(thread_w / 2)}"/></clipPath></defs>'
-    s += "".join(f'<path d="{bar_path(*b, r)}" fill="{paper}"/>' for b in over)
-    s += (f'<g clip-path="url(#{uid}-on-bars)"><path d="{thread_path()}" fill="none" stroke="{edge_color}" '
-          f'stroke-width="{f(thread_w + 2 * edge)}" stroke-linecap="round"/></g>')
-    s += f'<path d="{thread_path()}" fill="none" stroke="{saffron}" stroke-width="{f(thread_w)}" stroke-linecap="round"/>'
-    for b in under:
-        s += f'<g clip-path="url(#{uid}-on-thread)"><path d="{bar_path(*b, r + edge)}" fill="{edge_color}"/></g>'
-        s += f'<path d="{bar_path(*b, r)}" fill="{paper}"/>'
-    return s
-
-def svg_background():
-    return ('<defs><linearGradient id="bg" gradientUnits="userSpaceOnUse" x1="18" y1="14" x2="90" y2="98">'
-            f'<stop offset="0" stop-color="{INK_LIGHT}"/><stop offset="1" stop-color="{INK_DEEP}"/></linearGradient></defs>'
-            '<rect width="108" height="108" fill="url(#bg)"/>')
-
-# ---- Android drawables ---------------------------------------------------
-
-r = bar_w / 2
-over = [b for i, b in enumerate(bars) if i not in UNDER]
-under = [b for i, b in enumerate(bars) if i in UNDER]
-OVER_BARS = " ".join(bar_path(*b, r) for b in over)
-UNDER_BAR = " ".join(bar_path(*b, r) for b in under)
-UNDER_BAR_EDGE = " ".join(bar_path(*b, r + edge) for b in under)
-THREAD_D = thread_path()
-THREAD_BAND = band_polygon(thread_w / 2)
 NS = 'xmlns:android="http://schemas.android.com/apk/res/android"'
+HEADER = """<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated by tools/brand/generate_mark.py. Change the mark there and regenerate. -->
+"""
 
 def normalise(xml):
     """Lays the XML out as Android Studio does: one attribute per line,
@@ -167,253 +172,227 @@ def normalise(xml):
             out.append(line)
     return "\n".join(out)
 
-
-HEADER = """<?xml version="1.0" encoding="utf-8"?>
-<!-- Generated by tools/brand/generate_mark.py. Change the mark there and regenerate. -->
+def vector(size_dp, viewport, body):
+    return f"""<vector {NS}
+    android:width="{size_dp}dp"
+    android:height="{size_dp}dp"
+    android:viewportWidth="{f(viewport)}"
+    android:viewportHeight="{f(viewport)}">{body}</vector>
 """
 
+def seal(fill, cx, cy, r):
+    """The three parts as plain paths."""
+    out = "\n"
+    for part in REGIONS:
+        if PART_NOTES[part]:
+            out += f"    <!-- {PART_NOTES[part]} -->\n"
+        out += f"""    <path
+        android:fillColor="{fill}"
+        android:pathData="{path_data(part, cx, cy, r)}" />
+"""
+    return out
+
+def seal_before_entrance(fill, cx, cy, r):
+    """The three parts as splash_mark_animated finds them: each in a named
+    group set off from its place, its path named and faded out."""
+    out = "\n"
+    for part, (_, _, dx, dy) in ENTRANCE.items():
+        offsets = "".join(f'\n        android:{prop}="{f(v * r)}"' for prop, v in (("translateX", dx), ("translateY", dy)) if v)
+        out += f"""    <group
+        android:name="{part}"{offsets}>
+        <path
+            android:name="{part}_fill"
+            android:fillAlpha="0"
+            android:fillColor="{fill}"
+            android:pathData="{path_data(part, cx, cy, r)}" />
+    </group>
+"""
+    return out
+
+def animator(prop, start, duration, value_from, indent):
+    pad = " " * indent
+    return f"""{pad}<objectAnimator
+{pad}    android:duration="{duration}"
+{pad}    android:interpolator="@android:interpolator/fast_out_slow_in"
+{pad}    android:propertyName="{prop}"
+{pad}    android:startOffset="{start}"
+{pad}    android:valueFrom="{f(value_from)}"
+{pad}    android:valueTo="{'1' if prop == 'fillAlpha' else '0'}"
+{pad}    android:valueType="floatType" />
+"""
+
+def entrance(r):
+    out = ""
+    for part, (start, duration, dx, dy) in ENTRANCE.items():
+        moves = [("translateX", dx * r), ("translateY", dy * r)]
+        moves = [animator(prop, start, duration, v, 16) for prop, v in moves if v]
+        out += f"""    <target android:name="{part}">
+        <aapt:attr name="android:animation">
+            <set>
+{"".join(moves)}            </set>
+        </aapt:attr>
+    </target>
+    <target android:name="{part}_fill">
+        <aapt:attr name="android:animation">
+{animator("fillAlpha", start, duration, 0, 12)}        </aapt:attr>
+    </target>
+"""
+    return out
+
+def write_resources(res):
+    def write(name, text):
+        with open(os.path.join(res, name), "w") as fh:
+            fh.write(normalise(HEADER + text))
+        print(name)
+
+    argb = lambda colour: "#FF" + colour[1:]
+
+    write("drawable/ic_launcher_background.xml", f"""<!--
+    Flat ink indigo, the app's primary, so the icon and the app read as one
+    thing. No gradient: the seal is a silhouette and needs nothing behind it.
+-->
+""" + vector(108, 108, f"""
+    <path
+        android:fillColor="{argb(INDIGO)}"
+        android:pathData="M0,0h108v108h-108z" />
+"""))
+
+    write("drawable/ic_launcher_foreground.xml", f"""<!--
+    The Trackora seal: a disc, one whole job, cut by the T of Trackora into
+    three parts, the three stages a job goes through. Where the T's bar
+    crosses the stem it steps up a level: the work moving up a stage.
+
+    The seal is {f(2 * ICON_R)} units across, well inside the adaptive icon's 66-unit
+    safe zone, so no launcher mask cuts into it.
+-->
+""" + vector(108, 108, seal(argb(PAPER), C, C, ICON_R)))
+
+    write("drawable/ic_launcher_monochrome.xml", """<!--
+    The seal in one colour, for themed icons (Android 13+), which tint it
+    themselves. Its cuts are real gaps, so it needs no second colour to read.
+-->
+""" + vector(108, 108, seal("#FFFFFFFF", C, C, ICON_R)))
+
+    write("drawable/ic_notification.xml", """<!--
+    The status-bar icon for the daily reminder. Android draws small icons from
+    their alpha channel alone, in a colour of its own choosing, so this is the
+    seal as a white silhouette with its cuts as real gaps. The full-colour
+    launcher icon would show as a plain white square.
+
+    The seal fills the 20dp live area inside the icon's 2dp padding, and its
+    cuts stay at least 2dp wide.
+-->
+""" + vector(24, 24, seal("#FFFFFFFF", 12, 12, NOTIFICATION_R)))
+
+    write("drawable/splash_mark.xml", """<!--
+    The seal on the splash screen, on the app's own background, so the splash
+    hands over to the first screen without a change of colour. Its colour
+    follows the theme through @color/splash_mark. Android 7 to 11 show it
+    still; Android 12 and later play splash_mark_animated.
+-->
+""" + vector(108, 108, seal("@color/splash_mark", C, C, SPLASH_R)))
+
+    write("drawable/splash_mark_start.xml", """<!--
+    The splash seal before its entrance: each part named, faded out and set
+    off from its place. splash_mark_animated brings them in.
+-->
+""" + vector(108, 108, seal_before_entrance("@color/splash_mark", C, C, SPLASH_R)))
+
+    write("drawable/splash_mark_animated.xml", f"""<!--
+    The splash seal's entrance on Android 12 and later. Each part fades in as
+    it slides into place: the lower parts rise, then the top part steps up
+    along the 45° line, travelling less than one cut, so it never touches the
+    others. {ENTRANCE_MS}ms in all, and cut short if the app is ready sooner: the
+    splash never waits for it.
+-->
+<animated-vector {NS}
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:drawable="@drawable/splash_mark_start">
+{entrance(SPLASH_R)}</animated-vector>
+""")
+
+    write("values/splash.xml", f"""<resources>
+    <!-- How long splash_mark_animated runs, for the Android 12+ splash theme. -->
+    <integer name="splash_entrance_duration">{ENTRANCE_MS}</integer>
+</resources>
+""")
 
 # ---- Legacy launcher PNGs (Android 7.x, before adaptive icons) ---------------
 
 DENSITIES = [("mdpi", 48), ("hdpi", 72), ("xhdpi", 96), ("xxhdpi", 144), ("xxxhdpi", 192)]
-# The same rounded square as the icons they replaced (corner ~18% of the side), and a circle.
-LEGACY_SHAPES = {
-    "ic_launcher": '<rect x="18" y="18" width="72" height="72" rx="13" ry="13"/>',
-    "ic_launcher_round": '<circle cx="54" cy="54" r="36"/>',
-}
+# The middle 72 units of the canvas, the part a launcher shows, cut to the
+# same rounded square (corner ~18% of the side) and circle as before.
+CORNER = 13.0
 
+def rounded_square(x, y):
+    dx, dy = abs(x - C), abs(y - C)
+    ex, ey = max(dx - (36 - CORNER), 0), max(dy - (36 - CORNER), 0)
+    return dx <= 36 and dy <= 36 and ex * ex + ey * ey <= CORNER * CORNER
 
-def write_legacy_pngs(res_dir, chrome):
-    """Renders the full icon at each density with headless Chrome, whose SVG
-    renderer draws the same paths the vector drawables use."""
-    with tempfile.TemporaryDirectory() as tmp:
-        for density, px in DENSITIES:
-            for name, shape in LEGACY_SHAPES.items():
-                page = os.path.join(tmp, f"{name}-{density}.html")
-                with open(page, "w") as fh:
-                    fh.write(
-                        "<!doctype html><html><head><style>html,body{margin:0;background:transparent}</style></head><body>"
-                        f'<svg width="{px}" height="{px}" viewBox="18 18 72 72" style="display:block">'
-                        f'<defs><clipPath id="m">{shape}</clipPath></defs>'
-                        f'<g clip-path="url(#m)">{svg_background()}{svg_foreground()}</g></svg></body></html>'
-                    )
-                out = os.path.join(res_dir, f"mipmap-{density}", f"{name}.png")
-                subprocess.run(
-                    [chrome, "--headless=new", "--disable-gpu", "--hide-scrollbars",
-                     "--force-device-scale-factor=1", f"--user-data-dir={os.path.join(tmp, 'profile')}",
-                     "--default-background-color=00000000", f"--screenshot={out}",
-                     f"--window-size={px},{px}", f"file://{page}"],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True,
-                )
+def circle(x, y):
+    return (x - C) ** 2 + (y - C) ** 2 <= 36 * 36
 
+LEGACY_SHAPES = {"ic_launcher": rounded_square, "ic_launcher_round": circle}
+
+def _rgb(colour):
+    return tuple(int(colour[i:i + 2], 16) for i in (1, 3, 5))
+
+def rasterise(colour_at, x0, y0, span, px):
+    """Rows of RGBA pixels covering the square (x0, y0)–(x0 + span, y0 + span),
+    with colour_at giving an RGB triple, or None for clear, at any point.
+    Each pixel takes 16 samples, and 256 where an edge runs through it."""
+    unit = span / px
+
+    def samples(i, j, n):
+        return [colour_at(x0 + (i + (a + 0.5) / n) * unit, y0 + (j + (b + 0.5) / n) * unit)
+                for b in range(n) for a in range(n)]
+
+    rows = []
+    for j in range(px):
+        row = bytearray()
+        for i in range(px):
+            s = samples(i, j, 4)
+            if len(set(s)) > 1:
+                s = samples(i, j, 16)
+            hits = [c for c in s if c]
+            if hits:
+                row += bytes(round(sum(c[k] for c in hits) / len(hits)) for k in range(3))
+                row.append(round(255 * len(hits) / len(s)))
+            else:
+                row += b"\0\0\0\0"
+        rows.append(bytes(row))
+    return rows
+
+def png(rows):
+    def chunk(kind, data):
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
+    w, h = len(rows[0]) // 4, len(rows)
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 6, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(b"".join(b"\0" + r for r in rows), 9)) + chunk(b"IEND", b""))
+
+def launcher_colour(shape):
+    """The full icon, cut to a legacy shape: the paper seal on indigo."""
+    ground, mark = _rgb(INDIGO), _rgb(PAPER)
+    return lambda x, y: (mark if part_at((x - C) / ICON_R, (y - C) / ICON_R) else ground) if shape(x, y) else None
+
+def write_legacy_pngs(res):
+    for density, px in DENSITIES:
+        for name, shape in LEGACY_SHAPES.items():
+            with open(os.path.join(res, f"mipmap-{density}", f"{name}.png"), "wb") as fh:
+                fh.write(png(rasterise(launcher_colour(shape), 18, 18, 72, px)))
+    print("mipmap-*/ic_launcher.png, ic_launcher_round.png")
 
 # ---- Writing ------------------------------------------------------------------
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-parser.add_argument("--res", default=os.path.join(ROOT, "app", "src", "main", "res"))
-parser.add_argument("--chrome", default="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-                    help="headless Chrome, for the legacy PNGs")
-parser.add_argument("--no-png", action="store_true", help="write only the vector drawables")
-args = parser.parse_args()
-DRAWABLE = os.path.join(args.res, "drawable")
+def main():
+    root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser.add_argument("--res", default=os.path.join(root, "app", "src", "main", "res"))
+    parser.add_argument("--no-png", action="store_true", help="write only the vector drawables")
+    args = parser.parse_args()
+    write_resources(args.res)
+    if not args.no_png:
+        write_legacy_pngs(args.res)
 
-def write(name, text):
-    with open(os.path.join(DRAWABLE, name), "w") as fh:
-        fh.write(normalise(text))
-    print("drawable/" + name)
-
-def woven(mark_color, thread_color, edge_color, names=False, hidden=False):
-    """The mark's layers in drawing order. With names=True each part is named
-    so an animated vector can address it."""
-    def g(name):
-        """Names a part for the animation and, when hidden, sets it to where
-        the animation starts from: marks flat on their baseline, thread undrawn."""
-        if not names:
-            return ''
-        start = ''
-        if hidden:
-            start = '\n        android:scaleY="0"' if name.startswith('mark') else '\n        android:trimPathEnd="0"'
-        return f' android:name="{name}"{start}'
-    return f"""
-    <!-- The first and third marks: the thread passes over them. -->
-""" + "".join(f"""    <group{g('mark_' + str(i + 1))}
-        android:pivotX="{f(b[0])}"
-        android:pivotY="{f(b[2] + r)}">
-        <path
-            android:fillColor="{mark_color}"
-            android:pathData="{bar_path(*b, r)}" />
-    </group>
-""" for i, b in enumerate(bars) if i not in UNDER) + f"""    <!-- The ink edge around the thread, only where it lies on a mark. -->
-    <group>
-        <clip-path android:pathData="{OVER_BARS}" />
-        <path{g('thread_edge')}
-            android:pathData="{THREAD_D}"
-            android:strokeColor="{edge_color}"
-            android:strokeLineCap="round"
-            android:strokeWidth="{f(thread_w + 2 * edge)}" />
-    </group>
-    <!-- The thread, rising. -->
-    <path{g('thread')}
-        android:pathData="{THREAD_D}"
-        android:strokeColor="{thread_color}"
-        android:strokeLineCap="round"
-        android:strokeWidth="{f(thread_w)}" />
-    <!-- The middle mark passes over the thread, with an edge only where it does. -->
-    <group{g('mark_2')}
-        android:pivotX="{f(bars[1][0])}"
-        android:pivotY="{f(bars[1][2] + r)}">
-        <group>
-            <clip-path android:pathData="{THREAD_BAND}" />
-            <path
-                android:fillColor="{edge_color}"
-                android:pathData="{UNDER_BAR_EDGE}" />
-        </group>
-        <path
-            android:fillColor="{mark_color}"
-            android:pathData="{UNDER_BAR}" />
-    </group>
-"""
-
-# ---- Launcher icon ----------------------------------------------------------
-
-write("ic_launcher_background.xml", HEADER + f"""<!--
-    Ink indigo, lit from the top left: the app's primary (#2B4ACB) sits in the
-    middle of the gradient, so the icon and the app read as one thing.
--->
-<vector {NS}
-    xmlns:aapt="http://schemas.android.com/aapt"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <path android:pathData="M0,0h108v108h-108z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:endX="90"
-                android:endY="98"
-                android:startX="18"
-                android:startY="14"
-                android:type="linear">
-                <item android:color="#FF{INK_LIGHT[1:]}" android:offset="0" />
-                <item android:color="#FF{INK_DEEP[1:]}" android:offset="1" />
-            </gradient>
-        </aapt:attr>
-    </path>
-</vector>
-""")
-
-write("ic_launcher_foreground.xml", HEADER + f"""<!--
-    The Trackora mark: three upright marks — a job's three stages — and a
-    saffron thread rising through them, over the first, under the second and
-    over the third. A tally from the paper notebook the app replaces, woven
-    like the cloth of the workshops it is made for.
-
-    Everything sits inside the adaptive icon's 66dp safe zone, so no launcher
-    mask cuts into it.
--->
-<vector {NS}
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">{woven('#FF' + PAPER[1:], '#FF' + SAFFRON[1:], '#FF' + EDGE_INK[1:])}</vector>
-""")
-
-def frame_minus(hole):
-    return f"{FRAME} {hole}"
-
-b2 = bars[1]
-MONO = f"""
-    <!-- Marks one and three, with a gap where the thread crosses them. -->
-    <group>
-        <clip-path android:pathData="{frame_minus(band_polygon(thread_w / 2 + edge))}" />
-        <path
-            android:fillColor="#FFFFFFFF"
-            android:pathData="{OVER_BARS}" />
-    </group>
-    <!-- The thread, with a gap where the middle mark crosses it. -->
-    <group>
-        <clip-path android:pathData="{frame_minus(bar_path_ccw(b2[0], b2[1] - edge, b2[2] + edge, r + edge))}" />
-        <path
-            android:pathData="{THREAD_D}"
-            android:strokeColor="#FFFFFFFF"
-            android:strokeLineCap="round"
-            android:strokeWidth="{f(thread_w)}" />
-    </group>
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="{UNDER_BAR}" />
-"""
-
-write("ic_launcher_monochrome.xml", HEADER + f"""<!--
-    The mark in one colour, for themed icons (Android 13+), which tint it
-    themselves. With no second colour to tell the strands apart, the weave is
-    drawn as real gaps: each clip path is the whole canvas with the crossing
-    strand's outline wound the other way, which the non-zero rule turns into a
-    hole.
--->
-<vector {NS}
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">{MONO}</vector>
-""")
-
-# ---- Notification icon ------------------------------------------------------
-
-# Crop the canvas to the mark with a little room, so it fills the status bar slot.
-x0 = min(thread[0][0] - thread_w / 2, bars[0][0] - r) - 2
-x1 = max(thread[3][0] + thread_w / 2, bars[2][0] + r) + 2
-y0 = min(thread[3][1] - thread_w / 2, bars[0][1] - r) - 2
-y1 = max(thread[0][1] + thread_w / 2, bars[0][2] + r) + 2
-side = max(x1 - x0, y1 - y0)
-cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
-write("ic_notification.xml", HEADER + f"""<!--
-    Status-bar icon for the daily reminder: the Trackora mark as a single-colour
-    silhouette, the same shape as the themed launcher icon, cropped so it fills
-    the slot. The system tints status-bar icons itself, so only the shape
-    matters.
--->
-<vector {NS}
-    android:width="24dp"
-    android:height="24dp"
-    android:viewportWidth="{f(side)}"
-    android:viewportHeight="{f(side)}">
-    <group
-        android:translateX="{f(side / 2 - cx)}"
-        android:translateY="{f(side / 2 - cy)}">{MONO.replace(chr(10), chr(10) + '    ')}</group>
-</vector>
-""")
-
-# ---- Splash -----------------------------------------------------------------
-
-SPLASH_DOC = """<!--
-    The mark on the splash screen: the launcher icon's mark without its tile,
-    on the app's own background, so the splash hands over to the first screen
-    without a change of colour. Its colours follow the theme through
-    @color/splash_*.
--->"""
-write("splash_mark.xml", HEADER + SPLASH_DOC + f"""
-<vector {NS}
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">{woven('@color/splash_mark', '@color/splash_thread', '@color/splash_background')}</vector>
-""")
-
-# The animated version's starting frame (Android 12+): nothing drawn yet.
-write("splash_mark_start.xml", HEADER + f"""<!--
-    The splash mark before its animation runs: every part named, the marks
-    flat on their baseline and the thread not yet drawn. splash_mark_animated
-    raises the marks one after another and draws the thread through them.
--->
-<vector {NS}
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">{woven('@color/splash_mark', '@color/splash_thread', '@color/splash_background', names=True, hidden=True)}</vector>
-""")
-
-if not args.no_png:
-    write_legacy_pngs(args.res, args.chrome)
-    print("mipmap-*/ic_launcher.png, ic_launcher_round.png")
+if __name__ == "__main__":
+    main()
