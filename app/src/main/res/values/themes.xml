@@ -30,4 +30,26 @@
     </style>
 
     <style name="Theme.Trackora" parent="Base.Theme.Trackora" />
+
+    <!--
+        The launch theme. Android 12 and later draw their own splash screen for
+        every app; core-splashscreen draws the same one on Android 7 to 11, so
+        the app has exactly one splash, the platform's, on every version:
+        the Trackora mark on the app's own background. MainActivity installs it
+        before anything else, and it swaps in Theme.Trackora as soon as the
+        first screen is ready to draw.
+
+        The system bars take the splash's colour, so they do not change when
+        the first screen appears.
+    -->
+    <style name="Base.Theme.Trackora.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_mark</item>
+        <item name="postSplashScreenTheme">@style/Theme.Trackora</item>
+        <item name="android:statusBarColor">@color/splash_background</item>
+        <item name="android:navigationBarColor">@color/splash_background</item>
+        <item name="android:windowLightStatusBar">@bool/splash_light_system_bars</item>
+    </style>
+
+    <style name="Theme.Trackora.Starting" parent="Base.Theme.Trackora.Starting" />
 </resources>
