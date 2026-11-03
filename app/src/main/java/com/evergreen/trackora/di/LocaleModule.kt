@@ -57,7 +57,11 @@ object ThemeModule {
     @Provides
     @Singleton
     fun provideThemeManager(
-        @ThemeDataStore dataStore: DataStore<Preferences>
-    ): ThemeManager = ThemeManager(dataStore)
+        @ThemeDataStore dataStore: DataStore<Preferences>,
+        @ApplicationContext context: Context
+    ): ThemeManager = ThemeManager(
+        dataStore,
+        context.getSharedPreferences(ThemeManager.LAUNCH_THEME_PREFS, Context.MODE_PRIVATE)
+    )
 }
 
