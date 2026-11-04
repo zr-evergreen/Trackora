@@ -39,6 +39,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.navOptions
 import androidx.navigation.toRoute
 import com.evergreen.trackora.R
 import com.evergreen.trackora.domain.model.Status
@@ -123,16 +124,7 @@ fun NavGraph(
     ) { paddingValues ->
         // Work waiting to be delivered, in All Work: from Today's band and from
         // the waiting figure in Reports.
-        val openWaitingWork: () -> Unit = {
-            // Once All Work has been visited from the bottom bar its state is
-            // saved, and restoring it brings back the arguments it was saved
-            // with — dropping the filter passed here. Discard that saved state
-            // and open it fresh instead.
-            navController.clearBackStack<AllWorkRoute>()
-            navController.navigate(AllWorkRoute(initialStatus = Status.COMPLETED.name)) {
-                launchSingleTop = true
-            }
-        }
+        val openWaitingWork: () -> Unit = { navController.openWaitingWork() }
         NavHost(
             navController = navController,
             startDestination = startDestination,
@@ -202,6 +194,33 @@ fun NavGraph(
 internal fun NavController.openNewEntry() {
     if (currentDestination?.route?.contains("TodayRoute") != true) return
     navigate(AddEditWorkRoute())
+}
+
+/**
+ * Opens the work waiting to be delivered: All Work, filtered to Completed.
+ *
+ * A switch to the All Work tab, made the way the bottom bar makes one, so the
+ * tab it came from keeps its own history. Pushed on top of that tab instead,
+ * All Work became part of the tab's history: tapping Today or Reports
+ * afterwards restored it, and brought All Work straight back each time, so
+ * the tab could not be reached again except with Back.
+ *
+ * Once All Work has been visited from the bottom bar its state is saved, and
+ * restoring it brings back the arguments it was saved with — dropping the
+ * filter passed here. So that saved state is discarded, and All Work opens
+ * fresh rather than restored.
+ */
+internal fun NavController.openWaitingWork(
+    startDestinationId: Int = graph.findStartDestination().id
+) {
+    clearBackStack<AllWorkRoute>()
+    navigate(
+        AllWorkRoute(initialStatus = Status.COMPLETED.name),
+        navOptions {
+            popUpTo(startDestinationId) { saveState = true }
+            launchSingleTop = true
+        }
+    )
 }
 
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.fadeThroughIn(): EnterTransition =
