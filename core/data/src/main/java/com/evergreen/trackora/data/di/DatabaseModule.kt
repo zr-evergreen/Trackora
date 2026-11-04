@@ -1,9 +1,6 @@
 package com.evergreen.trackora.data.di
 
 import android.content.Context
-import androidx.room.Room
-import androidx.room.migration.Migration
-import androidx.sqlite.db.SupportSQLiteDatabase
 import com.evergreen.trackora.data.local.dao.WorkEntryDao
 import com.evergreen.trackora.data.local.database.TrackoraDatabase
 import dagger.Module
@@ -20,29 +17,22 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
 
-    private val MIGRATION_1_2 = object : Migration(1, 2) {
-        override fun migrate(database: SupportSQLiteDatabase) {
-            database.execSQL("ALTER TABLE work_entries ADD COLUMN photoUri TEXT")
-        }
-    }
-
+    /**
+     * The one database, opened the way [TrackoraDatabase.build] opens it.
+     *
+     * It used to fall back to destructive migration: any version without a
+     * migration path — a forgotten migration, or an older build installed
+     * over a newer one — deleted every entry and opened empty, silently. It
+     * now fails instead, and the entries stay on disk.
+     */
     @Provides
     @Singleton
     fun provideDatabase(
         @ApplicationContext context: Context
-    ): TrackoraDatabase {
-        return Room.databaseBuilder(
-            context,
-            TrackoraDatabase::class.java,
-            TrackoraDatabase.DATABASE_NAME
-        ).addMigrations(MIGRATION_1_2)
-            .fallbackToDestructiveMigration()
-            .build()
-    }
+    ): TrackoraDatabase = TrackoraDatabase.build(context)
 
     @Provides
     fun provideWorkEntryDao(database: TrackoraDatabase): WorkEntryDao {
         return database.workEntryDao()
     }
 }
-
