@@ -23,7 +23,8 @@ object DatabaseModule {
      * It used to fall back to destructive migration: any version without a
      * migration path — a forgotten migration, or an older build installed
      * over a newer one — deleted every entry and opened empty, silently. It
-     * now fails instead, and the entries stay on disk.
+     * now fails instead, and the entries stay on disk. Storage errors and
+     * corruption no longer delete it either; see [TrackoraDatabase.build].
      */
     @Provides
     @Singleton

@@ -171,9 +171,9 @@ class MigrationTest {
 
     /**
      * A database the app has no path for — here one from a newer build, as
-     * after installing an older version over it — must fail to open and be
-     * left exactly as it was. The destructive fallback this replaced deleted
-     * it and opened an empty one instead.
+     * after installing an older version over it — must fail to open and keep
+     * its version and every entry. The destructive fallback this replaced
+     * deleted it and opened an empty one instead.
      */
     @Test
     fun aDatabaseWithNoUpgradePathIsNeverDeleted() {

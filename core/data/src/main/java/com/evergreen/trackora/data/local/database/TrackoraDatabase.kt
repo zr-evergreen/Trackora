@@ -31,16 +31,24 @@ abstract class TrackoraDatabase : RoomDatabase() {
         const val VERSION = 2
 
         /**
-         * The database as the app opens it: upgraded step by step through
-         * [DatabaseMigrations], and never by deleting it. With no destructive
-         * fallback, a version Room has no path for — a missing migration, or a
-         * database from a newer build — fails to open and stays on disk as it
-         * was. The migration tests open it through here too, so they check the
-         * configuration users get.
+         * The database as the app opens it, which nothing deletes:
+         *
+         * - Upgraded step by step through [DatabaseMigrations], with no
+         *   destructive fallback. A version Room has no path for — a missing
+         *   migration, or a database from a newer build — fails to open, and
+         *   its entries stay on disk.
+         * - Opened through [FailSafeOpenHelperFactory]. A storage error while
+         *   opening fails that attempt and leaves the database as it is, and
+         *   a database SQLite reports as corrupt is kept, copied aside and
+         *   refused from then on, never replaced by an empty one.
+         *
+         * The tests open it through here too, so they check the configuration
+         * users get.
          */
         fun build(context: Context, name: String = DATABASE_NAME): TrackoraDatabase =
             Room.databaseBuilder(context, TrackoraDatabase::class.java, name)
                 .addMigrations(*DatabaseMigrations.ALL)
+                .openHelperFactory(FailSafeOpenHelperFactory())
                 .build()
     }
 }
