@@ -37,7 +37,11 @@ import java.time.LocalDate
 /**
  * What becomes of the database when SQLite reports a storage error or
  * corruption: it is never deleted, never replaced by an empty one, and a
- * corrupt one is kept with its `-wal` and `-shm`, copied aside and refused.
+ * corrupt one is kept, copied aside and refused. Its `-wal` and `-shm` are kept
+ * and copied too when Room's schema check or a query finds the damage. When
+ * Android's own connection setup finds it, Android may already have merged a
+ * live `-wal` into the file (see [FailSafeOpenHelperFactory]); no test here
+ * covers that case.
  *
  * Each protection has a control beside it, run without the fail-safe, which
  * shows the same situation deleting the database. That is what proves the
@@ -216,6 +220,8 @@ class DatabaseFailSafeTest {
     fun aDatabaseFoundCorruptWhenOpeningIsKeptCopiedAndRefused() = runBlocking {
         createWithEntries(3)
         // An unreadable header: SQLite reports "file is not a database" as it opens.
+        // The database was closed cleanly, so there is no -wal. With a live one,
+        // Android would merge it into the file before the copy is made.
         overwrite(0, ByteArray(100) { 0x42 })
         val original = bytes("")!!
 
@@ -337,9 +343,10 @@ class DatabaseFailSafeTest {
         database.close()
         assertTrue("No marker beside the database", marker.exists())
 
-        // The files exactly as they were, -wal and -shm included, are copied
-        // aside the moment SQLite reports the damage, before Android closes
-        // the failed connection.
+        // Room's schema check found the damage, so the files exactly as they
+        // were, -wal and -shm included, are copied aside before Android closes
+        // the failed connection. Had Android's connection setup found it, the
+        // -wal would already have been merged.
         val copy = copies().single()
         assertArrayEquals(main, File(copy, file.name).readBytes())
         assertArrayEquals(image.getValue("-wal"), File(copy, file.name + "-wal").readBytes())

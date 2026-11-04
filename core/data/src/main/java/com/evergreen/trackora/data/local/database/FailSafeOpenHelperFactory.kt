@@ -30,21 +30,69 @@ import java.io.File
  * - An error while opening reaches the helper as a [DatabaseOpenException],
  *   not an SQLiteException, so the helper rethrows it instead of deleting.
  *   Nothing is recorded; the next attempt simply tries again.
- * - Corruption leaves every file where it is. It is recorded in a marker file
- *   beside the database ([DAMAGED_SUFFIX]), the files are copied aside as they
- *   were, and from then on the database is refused with a
- *   [DatabaseDamagedException] without being opened, written or closed again,
- *   in this launch and every later one. Nothing tries to repair it. Recovery
- *   is left to a person, from the untouched originals or the copies.
+ * - Corruption never deletes or empties the database. It is recorded in a
+ *   marker file beside the database ([DAMAGED_SUFFIX]), the files there at that
+ *   moment are copied aside, and every later call is refused with a
+ *   [DatabaseDamagedException], in this launch and every later one. Nothing
+ *   tries to repair it. Recovery is left to a person.
  * - A `-wal` holding changes beside an empty or missing database file is
  *   treated the same way, before anything opens it: SQLite would delete that
  *   `-wal` as it opened the database, and Room would then create an empty one.
  *
- * One thing stays outside its reach: when corruption is found while the
- * database is being opened, Android closes the failed connection itself, and
- * that close may checkpoint the `-wal` into the database file. A checkpoint
- * loses no committed change, and the copies are taken before it, so the files
- * exactly as they were are still kept.
+ * Its limits, most of them set by Android and androidx.sqlite beneath it:
+ *
+ * - **The `-wal` can be merged before it is copied.** When Android's own
+ *   connection setup finds the corruption (a damaged header or schema, such as
+ *   "file is not a database" from `PRAGMA journal_mode`), Android closes the
+ *   failed connection before it reports the corruption. If the `-wal` holds
+ *   changes, as it does after the app has been killed, that close checkpoints
+ *   them into the database file and deletes the `-wal` and `-shm`. Committed
+ *   entries survive, in the database file, but neither the files in place nor
+ *   the copy are the originals any more. The files are copied as they were,
+ *   `-wal` and `-shm` included, only when Room's schema check or a later query
+ *   finds the damage.
+ * - **It is opened once more in the same launch.** After an attempt to open
+ *   fails, androidx.sqlite closes the database and tries again 500 ms later,
+ *   within the same call. That second attempt runs Android's connection setup
+ *   on the damaged file (recent Android versions may truncate a large `-wal`
+ *   there) before [FailSafeCallback.onConfigure] refuses it, and Android then
+ *   closes it again, which may checkpoint the `-wal`. Damage found once the
+ *   database is open is followed by no further open or close.
+ * - **The copies are best effort.** They are not atomic and are not retried at
+ *   a later launch, so a kill or a full disk can leave them partial or missing.
+ *   The marker's text, and the exception's message, say the files were kept as
+ *   they were and copied either way. The marker is not synced to disk: if it
+ *   is lost, or cannot be written, the next launch opens the database again
+ *   and keeps using it until it reaches the damage again.
+ * - **Not all corruption is reported.** Android does not call `onCorruption`
+ *   for errors while preparing a statement or on BEGIN and COMMIT. Such an
+ *   error fails that call without deleting anything, but is not recorded.
+ * - **The refusal lasts until a person removes the marker,** even after a
+ *   false report from failing storage. The user has no way out in the app, and
+ *   clearing its storage or uninstalling it deletes the database, the marker
+ *   and the copies. Auto Backup carries the marker and copies to a new device,
+ *   which then refuses the database too.
+ * - **An empty or missing database file without a `-wal`** holds nothing, and
+ *   a new database is created there. SQLite also discards a hot `-journal`
+ *   beside an empty file, which matters only in TRUNCATE journal mode (Room's
+ *   choice on low-RAM devices).
+ * - **Concurrent work.** A write on another thread that has already passed the
+ *   refusal can commit while the copies are made, so they may not be a
+ *   consistent set. Not closing a damaged database relies on it staying
+ *   reachable, as the app's singleton does; Android's finalizer closes one
+ *   that is garbage-collected, which checkpoints.
+ *
+ * It relies on the exact behaviour of androidx.sqlite 2.4.0 and Room 2.6.1:
+ * androidx.sqlite deletes only for an SQLiteException that is the direct cause
+ * of a failed `onOpen`, or for one outside the callbacks when
+ * `allowDataLossOnRecovery` is on, and on corruption only through
+ * [SupportSQLiteOpenHelper.Callback.onCorruption]; Room asks the helper for
+ * the database before every use. Both exceptions here must stay non-SQLite
+ * [IllegalStateException]s. The configuration is rebuilt field by field, and
+ * the database's path worked out as androidx.sqlite does. androidx.sqlite
+ * reaches the app only through Room and WorkManager, so a dependency update
+ * can replace it: the control tests then show if it stops deleting, but not
+ * if it starts deleting somewhere new. Recheck this class on any such update.
  *
  * Everything else is Room's own callback, unchanged.
  */
@@ -122,8 +170,10 @@ private class Damage(private val file: File?) {
     /**
      * Records that the database at [path] is damaged: the marker first, so
      * that the refusal survives even if the copies do not fit on a full disk,
-     * then a copy of each of its files. Nothing is deleted, moved or
-     * overwritten, and a failure here changes nothing else.
+     * then a copy of each of its files as they are now, which may already have
+     * had their `-wal` merged (see [FailSafeOpenHelperFactory]). Nothing is
+     * deleted, moved or overwritten here, and a failure here changes nothing
+     * else. The copies are not atomic and are not retried.
      */
     @Synchronized
     fun record(path: String?, reason: String = "SQLite reported it as corrupt") {
@@ -177,7 +227,8 @@ private class FailSafeCallback(
     override fun onConfigure(db: SupportSQLiteDatabase) {
         // Corruption reported while this very open was under way: Android
         // opens the file again after reporting it, and if that succeeds the
-        // database must still not be used.
+        // database must still not be used. This also refuses androidx.sqlite's
+        // retry, but only after Android's connection setup has run on the file.
         damage.refuseIfFound()
         delegate.onConfigure(db)
     }
@@ -209,9 +260,10 @@ private class FailSafeCallback(
 }
 
 /**
- * The helper, refusing a database found corrupt before it is touched again,
+ * The helper, refusing every call once the database has been found corrupt,
  * and not closing it: closing ends with a checkpoint that writes the `-wal`
- * into the database file.
+ * into the database file. androidx.sqlite's own retry, inside the call that
+ * found the damage, is beyond its reach (see [FailSafeOpenHelperFactory]).
  */
 private class FailSafeOpenHelper(
     private val delegate: SupportSQLiteOpenHelper,
