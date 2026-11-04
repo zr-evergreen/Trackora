@@ -10,12 +10,14 @@ import androidx.hilt.navigation.compose.hiltViewModel
  * Navigation graph for Reports feature.
  */
 fun NavGraphBuilder.reportsNavigation(
-    contentPadding: PaddingValues
+    contentPadding: PaddingValues,
+    onOpenWaiting: () -> Unit,
 ) {
     composable<ReportsRoute> {
         ReportsScreen(
             contentPadding = contentPadding,
-            viewModel = hiltViewModel()
+            viewModel = hiltViewModel(),
+            onOpenWaiting = onOpenWaiting
         )
     }
 }

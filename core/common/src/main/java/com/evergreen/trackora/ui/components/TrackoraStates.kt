@@ -90,6 +90,9 @@ fun TrackoraEmptyState(
     modifier: Modifier = Modifier,
     body: String? = null,
     icon: ImageVector? = null,
+    /** A way out of the state, such as clearing a search; shown when both are given. */
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
 ) {
     StateLayout(modifier) {
         if (icon != null) {
@@ -117,6 +120,12 @@ fun TrackoraEmptyState(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
+        }
+        if (actionLabel != null && onAction != null) {
+            Spacer(modifier = Modifier.size(20.dp))
+            FilledTonalButton(onClick = onAction) {
+                Text(text = actionLabel)
+            }
         }
     }
 }

@@ -86,5 +86,34 @@ object PersianSearch {
         return normalize(haystack).withoutSpaces().contains(normalize(needle).withoutSpaces())
     }
 
+    /**
+     * Where [needle] occurs in [haystack], as indices into the original
+     * [haystack], or null when it does not occur or [needle] is blank.
+     *
+     * Folds both sides exactly as [matches] does, so a highlight appears
+     * precisely when a row matched. Each surviving character remembers where
+     * it came from, which is what lets a query typed as «کار» highlight the
+     * «كار» actually stored, or «تکمیل شده» highlight «تکمیل‌شده» — the range
+     * spans the original characters, half-space and all.
+     */
+    fun matchRange(haystack: String?, needle: String): IntRange? {
+        if (needle.isBlank() || haystack.isNullOrEmpty()) return null
+        val target = normalize(needle).withoutSpaces()
+        if (target.isEmpty()) return null
+
+        val folded = StringBuilder(haystack.length)
+        val origin = ArrayList<Int>(haystack.length)
+        haystack.forEachIndexed { index, char ->
+            if (char in STRIPPED || char.isWhitespace()) return@forEachIndexed
+            val letter = LETTER_FOLDING[char] ?: char
+            folded.append(PersianDigits.toWestern(letter.toString()).lowercase())
+            while (origin.size < folded.length) origin.add(index)
+        }
+
+        val start = folded.indexOf(target)
+        if (start < 0) return null
+        return origin[start]..origin[start + target.length - 1]
+    }
+
     private fun String.withoutSpaces(): String = filterNot { it.isWhitespace() }
 }

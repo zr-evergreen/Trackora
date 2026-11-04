@@ -5,6 +5,9 @@ import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.rounded.ReceiptLong
+import androidx.compose.material.icons.automirrored.rounded.TrendingDown
+import androidx.compose.material.icons.automirrored.rounded.TrendingFlat
+import androidx.compose.material.icons.automirrored.rounded.TrendingUp
 import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Today
@@ -22,6 +25,7 @@ import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.EventAvailable
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Insights
+import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.IosShare
 import androidx.compose.material.icons.rounded.LightMode
 import androidx.compose.material.icons.rounded.LocalShipping
@@ -87,6 +91,14 @@ object TrackoraIcons {
     val AddPhoto: ImageVector = Icons.Rounded.AddPhotoAlternate
     val Calendar: ImageVector = Icons.Rounded.CalendarMonth
     val Export: ImageVector = Icons.Rounded.IosShare
+    /** An entry that has a photo attached. */
+    val Photo: ImageVector = Icons.Rounded.Image
+
+    // Direction of a figure against the period before. AutoMirrored, because
+    // in RTL time runs right to left and a rise climbs leftwards.
+    val TrendUp: ImageVector = Icons.AutoMirrored.Rounded.TrendingUp
+    val TrendDown: ImageVector = Icons.AutoMirrored.Rounded.TrendingDown
+    val TrendFlat: ImageVector = Icons.AutoMirrored.Rounded.TrendingFlat
 
     // Sections and subjects
     val Waiting: ImageVector = Icons.Rounded.PendingActions

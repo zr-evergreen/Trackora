@@ -38,4 +38,6 @@
     <string name="action_mark_delivered">ثبت تحویل</string>
     <!-- Read by screen readers on a row's action button. -->
     <string name="action_for_entry">%1$s، %2$s</string>
+    <!-- Read with an entry card that has a photo, in place of its small photo icon. -->
+    <string name="work_has_photo">عکس پیوست شده</string>
 </resources>

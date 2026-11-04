@@ -219,4 +219,137 @@ class ReportsViewModelTest {
         assertNull(viewModel.uiState.value.errorMessage)
         assertFalse(viewModel.uiState.value.isLoading)
     }
+
+    // --- Daily figures and the period's status split --------------------------
+
+    private fun entryOn(
+        id: Long,
+        date: LocalDate,
+        status: Status = Status.COMPLETED,
+        quantity: Int? = null
+    ) = WorkEntry(id = id, title = "Entry $id", status = status, date = date, quantity = quantity)
+
+    @Test
+    fun `every day of the week is reported, quiet days included, oldest first`() = runTest {
+        stub(weekEntries = listOf(entryOn(1, today.minusDays(3))))
+
+        val days = viewModel().uiState.value.weekly.days
+
+        assertEquals(7, days.size)
+        assertEquals(today.minusDays(6), days.first().date)
+        assertEquals(today, days.last().date)
+        assertEquals(listOf(0, 0, 0, 1, 0, 0, 0), days.map { it.finished })
+    }
+
+    @Test
+    fun `the days add up to the window's headline figures`() = runTest {
+        // The chart and the number above it must never disagree.
+        stub(
+            weekEntries = listOf(
+                entryOn(1, today, Status.DELIVERED, quantity = 4),
+                entryOn(2, today, Status.IN_PROGRESS, quantity = 6),
+                entryOn(3, today.minusDays(2), Status.COMPLETED, quantity = null),
+                entryOn(4, today.minusDays(6), Status.COMPLETED, quantity = 10)
+            )
+        )
+
+        val weekly = viewModel().uiState.value.weekly
+
+        assertEquals(weekly.completed, weekly.days.sumOf { it.finished })
+        assertEquals(weekly.totalQuantity, weekly.days.sumOf { it.units })
+        // Units count every status, as the headline does; finished does not.
+        assertEquals(DayFigures(today, finished = 1, units = 10), weekly.days.last())
+    }
+
+    @Test
+    fun `the month reports thirty days and the previous window its own thirty`() = runTest {
+        stub(previousMonthEntries = listOf(entryOn(1, today.minusDays(59), quantity = 2)))
+
+        val monthly = viewModel().uiState.value.monthly
+
+        assertEquals(30, monthly.days.size)
+        assertEquals(30, monthly.previousDays.size)
+        assertEquals(today.minusDays(59), monthly.previousDays.first().date)
+        assertEquals(2, monthly.previousDays.first().units)
+    }
+
+    @Test
+    fun `yesterday is today's previous day, for the today-versus-yesterday chart`() = runTest {
+        val yesterday = today.minusDays(1)
+        stub(
+            todayEntries = listOf(entry(1)),
+            yesterdayEntries = listOf(entryOn(2, yesterday), entryOn(3, yesterday))
+        )
+
+        val daily = viewModel().uiState.value.daily
+
+        assertEquals(listOf(today), daily.days.map { it.date })
+        assertEquals(listOf(today.minusDays(1)), daily.previousDays.map { it.date })
+        assertEquals(2, daily.previousDays.single().finished)
+    }
+
+    @Test
+    fun `the status split covers everything recorded and agrees with completed`() = runTest {
+        stub(
+            weekEntries = listOf(
+                entry(1, Status.IN_PROGRESS),
+                entry(2, Status.IN_PROGRESS),
+                entry(3, Status.COMPLETED),
+                entry(4, Status.DELIVERED),
+                entry(5, Status.DELIVERED)
+            )
+        )
+
+        val weekly = viewModel().uiState.value.weekly
+
+        assertEquals(2, weekly.inProgress)
+        assertEquals(1, weekly.waiting)
+        assertEquals(2, weekly.delivered)
+        assertEquals(5, weekly.recorded)
+        assertEquals(weekly.completed, weekly.waiting + weekly.delivered)
+    }
+
+    @Test
+    fun `units are compared with the previous window too`() = runTest {
+        stub(
+            weekEntries = listOf(entry(1, quantity = 20)),
+            previousWeekEntries = listOf(entry(2, quantity = 12))
+        )
+
+        val weekly = viewModel().uiState.value.weekly
+
+        assertEquals(12, weekly.previousQuantity)
+        assertEquals(8, weekly.quantityChangeVsPrevious)
+    }
+
+    @Test
+    fun `no units in either window reports no units comparison`() = runTest {
+        stub(weekEntries = listOf(entry(1)))
+
+        assertNull(viewModel().uiState.value.weekly.quantityChangeVsPrevious)
+    }
+
+    @Test
+    fun `work only in progress still counts as activity`() = runTest {
+        // Three jobs started today, none finished and no quantities yet, used
+        // to show "Nothing recorded yet".
+        stub(todayEntries = listOf(entry(1, Status.IN_PROGRESS)))
+
+        assertTrue(viewModel().uiState.value.daily.hasActivity)
+    }
+
+    @Test
+    fun `the oldest waiting job is reported, and nothing when none waits`() = runTest {
+        stub(
+            undelivered = listOf(
+                entryOn(1, today.minusDays(2)),
+                entryOn(2, today.minusDays(9)),
+                entryOn(3, today)
+            )
+        )
+        assertEquals(today.minusDays(9), viewModel().uiState.value.oldestWaiting)
+
+        stub()
+        assertNull(viewModel().uiState.value.oldestWaiting)
+    }
 }

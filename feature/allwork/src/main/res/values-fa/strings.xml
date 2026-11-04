@@ -19,5 +19,17 @@
         <item quantity="one">%1$d کار</item>
         <item quantity="other">%1$d کار</item>
     </plurals>
+    <!-- زیر عنوان، وقتی فیلتر یا جستجو فهرست را محدود کرده. -->
+    <plurals name="all_work_count_of">
+        <item quantity="one">%1$d از %2$d کار</item>
+        <item quantity="other">%1$d از %2$d کار</item>
+    </plurals>
+    <plurals name="all_work_items">
+        <item quantity="one">%1$d عدد</item>
+        <item quantity="other">%1$d عدد</item>
+    </plurals>
+    <!-- Persian comma, not a middle dot: beside Persian digits a dot reads as a zero (۰). -->
+    <string name="all_work_summary">%1$s، %2$s</string>
+    <string name="all_work_show_all">نمایش همه کارها</string>
+    <string name="all_work_filter_description">%1$s، %2$s</string>
 </resources>
-

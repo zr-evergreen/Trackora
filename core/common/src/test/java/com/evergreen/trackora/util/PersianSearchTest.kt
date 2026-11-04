@@ -140,4 +140,58 @@ class PersianSearchTest {
     fun `normalize leaves ordinary Latin text alone apart from case`() {
         assertEquals("hem trousers", PersianSearch.normalize("Hem Trousers"))
     }
+
+    // --- Match ranges, for highlighting ------------------------------------
+
+    @Test
+    fun `matchRange points at the stored text, not the folded copy`() {
+        // Typed with Persian keheh, stored with Arabic kaf.
+        val stored = "سفارش كار جدید"
+        val range = PersianSearch.matchRange(stored, "کار")
+
+        assertEquals("كار", stored.substring(range!!.first, range.last + 1))
+    }
+
+    @Test
+    fun `matchRange spans a half-space that the query typed as a space`() {
+        val stored = "کت تکمیل\u200Cشده"
+        val range = PersianSearch.matchRange(stored, "تکمیل شده")
+
+        assertEquals("تکمیل\u200Cشده", stored.substring(range!!.first, range.last + 1))
+    }
+
+    @Test
+    fun `matchRange finds a quantity typed in Persian digits`() {
+        val range = PersianSearch.matchRange("Order 12 pieces", "۱۲")
+
+        assertEquals(6..7, range)
+    }
+
+    @Test
+    fun `matchRange ignores case in Latin text`() {
+        assertEquals(4..9, PersianSearch.matchRange("Hem Trousers", "TROUSERS".take(6)))
+    }
+
+    @Test
+    fun `matchRange is null exactly when matches is false`() {
+        val samples = listOf(
+            "کار جدید" to "كار",
+            "Nike order 42" to "order 4",
+            "Nike order 42" to "adidas",
+            "تکمیل\u200Cشده" to "تکمیلشده",
+            "" to "x"
+        )
+        samples.forEach { (haystack, needle) ->
+            assertEquals(
+                "\"$needle\" in \"$haystack\"",
+                PersianSearch.matches(haystack, needle),
+                PersianSearch.matchRange(haystack, needle) != null
+            )
+        }
+    }
+
+    @Test
+    fun `a blank query highlights nothing`() {
+        assertEquals(null, PersianSearch.matchRange("Hem trousers", "  "))
+    }
 }
