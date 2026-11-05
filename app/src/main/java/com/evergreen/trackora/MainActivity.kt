@@ -7,7 +7,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 
 import android.os.Bundle
+import android.view.View
 import android.view.animation.PathInterpolator
+import android.window.SplashScreenView
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.splashscreen.SplashScreenViewProvider
@@ -78,18 +81,18 @@ class MainActivity : AppCompatActivity() {
      * beneath it: the splash fades as its mark lifts slightly towards the
      * viewer, instead of being cut away. Short, because by now the app is
      * ready and the splash is only in the way; with animations turned off it
-     * is removed at once.
+     * is removed at once. A splash without a mark just fades.
      */
     private fun leaveSplash(splash: SplashScreenViewProvider) {
         val duration = TrackoraMotion.MEDIUM.toLong()
         // TrackoraMotion.EmphasizedAccelerate, as a platform interpolator.
         val leaving = PathInterpolator(0.3f, 0f, 0.8f, 0.15f)
-        splash.iconView.animate()
-            .scaleX(1.08f)
-            .scaleY(1.08f)
-            .setDuration(duration)
-            .setInterpolator(leaving)
-            .start()
+        splash.iconOrNull()?.animate()
+            ?.scaleX(1.08f)
+            ?.scaleY(1.08f)
+            ?.setDuration(duration)
+            ?.setInterpolator(leaving)
+            ?.start()
         splash.view.animate()
             .alpha(0f)
             .setDuration(duration)
@@ -97,6 +100,20 @@ class MainActivity : AppCompatActivity() {
             .withEndAction(splash::remove)
             .start()
     }
+
+    /**
+     * The splash's mark, or null when it has none.
+     *
+     * Android 12 and later sometimes show a splash of plain colour with no
+     * icon, for example when the app is opened from its daily reminder
+     * notification. For that splash, core-splashscreen 1.0.1's `iconView`
+     * throws a NullPointerException instead of returning null, so on those
+     * versions the icon is read from the platform's splash view directly.
+     * Before Android 12 the library draws the splash itself, and its icon
+     * view is always there.
+     */
+    private fun SplashScreenViewProvider.iconOrNull(): View? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PlatformSplash.iconOf(view) else iconView
 
     /**
      * Asks for POST_NOTIFICATIONS on Android 13 and above.
@@ -127,5 +144,15 @@ class MainActivity : AppCompatActivity() {
 
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* respected either way */ }
+}
+
+/**
+ * The parts of Android 12's own splash that MainActivity reads. Kept out of
+ * MainActivity, so Android 7 to 11, which do not have [SplashScreenView],
+ * never load a class that refers to it.
+ */
+@RequiresApi(Build.VERSION_CODES.S)
+private object PlatformSplash {
+    fun iconOf(splash: View): View? = (splash as? SplashScreenView)?.iconView
 }
 
