@@ -38,6 +38,17 @@ jobs:
       - name: Assemble
         run: ./gradlew assembleDebug --stacktrace
 
+      # The build exports each database version's schema to
+      # core/data/schemas. One it changed or added means a database change
+      # that was not committed, and so not migrated or tested against.
+      - name: Room schemas are committed
+        run: |
+          if [ -n "$(git status --porcelain -- core/data/schemas)" ]; then
+            git status --porcelain -- core/data/schemas
+            echo "::error::The build changed core/data/schemas. Commit the schema; if the database changed, raise TrackoraDatabase.VERSION and add a migration."
+            exit 1
+          fi
+
       - name: Unit tests
         run: ./gradlew testDebugUnitTest --stacktrace
 

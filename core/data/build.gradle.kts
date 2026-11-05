@@ -35,6 +35,21 @@ android {
     kotlinOptions {
         jvmTarget = "11"
     }
+
+    // The exported schemas double as test assets: MigrationTestHelper builds
+    // each old version of the database from its JSON.
+    sourceSets {
+        getByName("androidTest").assets.srcDir("$projectDir/schemas")
+    }
+}
+
+// Room writes the schema of every database version here, one JSON per
+// version. They are committed: they are the record of what users' databases
+// look like, which migrations are written and tested against.
+kapt {
+    arguments {
+        arg("room.schemaLocation", "$projectDir/schemas")
+    }
 }
 
 dependencies {
