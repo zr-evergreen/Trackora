@@ -57,16 +57,35 @@ class DatabaseFailSafeTest {
     private val file: File get() = context.getDatabasePath(name)
     private val marker: File get() = File(file.path + DAMAGED_SUFFIX)
 
+    private val copiesFolder: File get() = File(file.path + DAMAGED_COPIES_SUFFIX)
+
     @After
     fun deleteTestFiles() {
         context.deleteDatabase(name)
-        marker.delete()
-        copies().forEach { it.deleteRecursively() }
+        copiesFolder.setWritable(true, false)
+        // The marker, the copies folder, and the folders and look-alikes the tests make beside them.
+        file.parentFile?.listFiles { f -> f.name.startsWith(name + DAMAGED_SUFFIX) }?.forEach { it.deleteRecursively() }
     }
 
+    /** The folders the database's files were copied into, one for each time damage was recorded. */
     private fun copies(): List<File> =
-        file.parentFile?.listFiles { f -> f.isDirectory && f.name.startsWith(name + DAMAGED_SUFFIX + "-") }
+        copiesFolder.listFiles { f -> f.isDirectory }?.toList().orEmpty()
+
+    /** Folders beside the database in the layout earlier versions used: `<name>.damaged-<millis>`. */
+    private fun oldStyleCopies(): List<File> =
+        file.parentFile?.listFiles { f -> f.isDirectory && f.name.matches(Regex(Regex.escape(name + DAMAGED_SUFFIX) + "-\\d+(-\\d+)?")) }
             ?.toList().orEmpty()
+
+    /** An earlier version's copies folder, holding [files] (name to content). */
+    private fun oldStyleCopy(stamp: String, files: Map<String, ByteArray>): File =
+        File(file.parentFile, "$name$DAMAGED_SUFFIX-$stamp").apply {
+            mkdirs()
+            files.forEach { (n, content) -> File(this, n).writeBytes(content) }
+        }
+
+    /** Every file under [folder], by its path relative to it, with its content. */
+    private fun contents(folder: File): Map<String, List<Byte>> =
+        folder.walkTopDown().filter { it.isFile }.associate { it.relativeTo(folder).path to it.readBytes().toList() }
 
     private fun bytes(suffix: String): ByteArray? = File(file.path + suffix).takeIf { it.exists() }?.readBytes()
 
@@ -418,6 +437,110 @@ class DatabaseFailSafeTest {
         assertTrue(copies().isEmpty())
     }
 
+    // ---- Where the copies are kept --------------------------------------------
+
+    @Test
+    fun copiesAreKeptInOneFolderBesideTheDatabase() {
+        createWithEntries(3)
+        overwrite(0, ByteArray(100) { 0x42 })
+        val original = bytes("")!!
+
+        val database = TrackoraDatabase.build(context, name)
+        assertThrows(DatabaseDamagedException::class.java) { database.openHelper.writableDatabase }
+        database.close()
+
+        val databaseFiles = listOf("", "-wal", "-shm", "-journal").map { name + it }
+        val added = file.parentFile!!.list()!!.filter { it.startsWith(name) && it !in databaseFiles }.sorted()
+        assertEquals(listOf(name + DAMAGED_SUFFIX, name + DAMAGED_COPIES_SUFFIX), added)
+        val copy = copies().single()
+        assertTrue("Not named by its time: ${copy.name}", copy.name.matches(Regex("\\d+")))
+        assertArrayEquals(original, File(copy, file.name).readBytes())
+        assertTrue(oldStyleCopies().isEmpty())
+    }
+
+    @Test
+    fun copiesKeptByEarlierVersionsAreMovedIntoTheFolderUntouched() = runBlocking {
+        createWithEntries(3)
+        val first = oldStyleCopy("1793900000000", mapOf(name to ByteArray(4096) { it.toByte() }, "$name-wal" to ByteArray(512) { 7 }))
+        val second = oldStyleCopy("1793900000000-1", mapOf(name to ByteArray(100) { 3 }))
+        val expected = mapOf("1793900000000" to contents(first), "1793900000000-1" to contents(second))
+        // Look-alikes that are not earlier copies, and stay where they are.
+        val lookAlikeFile = File(file.parentFile, "$name$DAMAGED_SUFFIX-1793900000002").apply { writeText("a file, not a folder") }
+        val lookAlikeFolder = File(file.parentFile, "$name$DAMAGED_SUFFIX-notes").apply { mkdirs(); File(this, "n").writeText("n") }
+
+        val database = TrackoraDatabase.build(context, name)
+        try {
+            assertEquals("Opened as before", 3, database.workEntryDao().getAllEntries().first().size)
+        } finally {
+            database.close()
+        }
+
+        assertTrue("Left beside the database: ${oldStyleCopies()}", oldStyleCopies().isEmpty())
+        assertEquals(expected, copies().associate { it.name to contents(it) })
+        assertEquals("a file, not a folder", lookAlikeFile.readText())
+        assertEquals("n", File(lookAlikeFolder, "n").readText())
+        assertFalse(marker.exists())
+    }
+
+    @Test
+    fun earlierCopiesOfARefusedDatabaseAreMovedAndItStaysRefused() {
+        createWithEntries(3)
+        marker.writeText("Recorded by an earlier version.\n")
+        val markerBefore = marker.readBytes()
+        val databaseBefore = bytes("")!!
+        val old = oldStyleCopy("1793900000000", mapOf(name to databaseBefore))
+        val expected = contents(old)
+
+        val database = TrackoraDatabase.build(context, name)
+        assertThrows(DatabaseDamagedException::class.java) { database.openHelper.writableDatabase }
+        database.close()
+
+        assertArrayEquals("The marker was changed", markerBefore, marker.readBytes())
+        assertArrayEquals("The database file was changed", databaseBefore, bytes(""))
+        assertTrue(oldStyleCopies().isEmpty())
+        assertEquals(expected, contents(copies().single()))
+    }
+
+    @Test
+    fun aNameAlreadyTakenInTheFolderIsNeverOverwritten() = runBlocking {
+        createWithEntries(1)
+        val taken = File(copiesFolder, "1793900000000")
+        taken.mkdirs()
+        File(taken, name).writeBytes(byteArrayOf(1, 2, 3))
+        val old = oldStyleCopy("1793900000000", mapOf(name to byteArrayOf(9, 9)))
+
+        val database = TrackoraDatabase.build(context, name)
+        try {
+            database.workEntryDao().getAllEntries().first()
+        } finally {
+            database.close()
+        }
+
+        assertArrayEquals(byteArrayOf(1, 2, 3), File(taken, name).readBytes())
+        assertArrayEquals(byteArrayOf(9, 9), File(copiesFolder, "1793900000000-moved-1/$name").readBytes())
+        assertFalse(old.exists())
+    }
+
+    @Test
+    fun aFolderThatCannotBeMovedStaysWhereItIsAndTheDatabaseStillOpens() = runBlocking {
+        createWithEntries(2)
+        val old = oldStyleCopy("1793900000000", mapOf(name to byteArrayOf(7)))
+        copiesFolder.mkdirs()
+        assertTrue(copiesFolder.setWritable(false, false))
+
+        val database = TrackoraDatabase.build(context, name)
+        try {
+            assertEquals(2, database.workEntryDao().getAllEntries().first().size)
+        } finally {
+            database.close()
+            copiesFolder.setWritable(true, false)
+        }
+
+        assertTrue("Moved into a folder it could not write to", old.isDirectory)
+        assertArrayEquals(byteArrayOf(7), File(old, name).readBytes())
+        assertTrue(copies().isEmpty())
+    }
+
     // ---- Nothing else changes ------------------------------------------------
 
     @Test
@@ -432,6 +555,6 @@ class DatabaseFailSafeTest {
         }
 
         assertFalse(marker.exists())
-        assertTrue(copies().isEmpty())
+        assertFalse(copiesFolder.exists())
     }
 }
