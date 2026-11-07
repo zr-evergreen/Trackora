@@ -32,7 +32,8 @@ import java.io.File
  *   Nothing is recorded; the next attempt simply tries again.
  * - Corruption never deletes or empties the database. It is recorded in a
  *   marker file beside the database ([DAMAGED_SUFFIX]), the files there at that
- *   moment are copied aside, and every later call is refused with a
+ *   moment are copied into a new subfolder of one folder beside it
+ *   ([DAMAGED_COPIES_SUFFIX]), and every later call is refused with a
  *   [DatabaseDamagedException], in this launch and every later one. Nothing
  *   tries to repair it. Recovery is left to a person.
  * - A `-wal` holding changes beside an empty or missing database file is
@@ -108,6 +109,7 @@ internal class FailSafeOpenHelperFactory(
             else -> configuration.context.getDatabasePath(name)
         }
         val damage = Damage(file)
+        damage.gatherOldCopies()
         val helper = delegate.create(
             SupportSQLiteOpenHelper.Configuration.builder(configuration.context)
                 .name(name)
@@ -121,8 +123,15 @@ internal class FailSafeOpenHelperFactory(
     }
 }
 
-/** Appended to the database's path to name its corruption marker, and the folders its files are copied to. */
+/** Appended to the database's path to name its corruption marker. */
 internal const val DAMAGED_SUFFIX = ".damaged"
+
+/**
+ * Appended to the database's path to name the one folder its copies are kept
+ * in, a subfolder for each time damage was recorded. A single fixed name, so
+ * that backup rules can leave out every copy at once.
+ */
+internal const val DAMAGED_COPIES_SUFFIX = ".damaged-copies"
 
 /** The database was found corrupt. Its files are kept for recovery and it is not opened again. */
 internal class DatabaseDamagedException(message: String, cause: Throwable? = null) :
@@ -182,8 +191,9 @@ private class Damage(private val file: File?) {
         if (!first || file == null || marker == null) return
 
         val path = path ?: file.path
+        val copies = File(file.path + DAMAGED_COPIES_SUFFIX)
         val folder = generateSequence(0) { it + 1 }
-            .map { n -> File(file.parentFile, file.name + DAMAGED_SUFFIX + "-" + System.currentTimeMillis() + (if (n == 0) "" else "-$n")) }
+            .map { n -> File(copies, System.currentTimeMillis().toString() + (if (n == 0) "" else "-$n")) }
             .first { !it.exists() }
 
         try {
@@ -211,6 +221,42 @@ private class Damage(private val file: File?) {
             Log.e(TAG, "Could not copy the corrupt database $path aside", e)
         }
         Log.e(TAG, "$reason: $path. It is kept and no longer opened")
+    }
+
+    /**
+     * Moves the copies kept by earlier versions, each in its own folder beside
+     * the database (`<name>.damaged-<millis>`), into the [DAMAGED_COPIES_SUFFIX]
+     * folder under their `<millis>` name, beside the ones made from now on.
+     *
+     * Each move is a rename within the same directory tree, so a folder moves
+     * whole or not at all. Nothing is deleted, copied or overwritten: a name
+     * already taken gets a `-moved-<n>` suffix, and a folder that cannot be
+     * moved stays where it is. The marker is left alone, so its text still
+     * names a moved folder's old path. Runs before the database is opened,
+     * whether it is refused or not, and never fails the open.
+     */
+    fun gatherOldCopies() {
+        val file = file ?: return
+        try {
+            val oldName = Regex(Regex.escape(file.name + DAMAGED_SUFFIX) + "-(\\d+(?:-\\d+)?)")
+            val old = file.parentFile?.listFiles { f -> f.isDirectory && oldName.matches(f.name) }
+            if (old.isNullOrEmpty()) return
+            val copies = File(file.path + DAMAGED_COPIES_SUFFIX)
+            copies.mkdirs()
+            for (folder in old) {
+                val stamp = oldName.matchEntire(folder.name)!!.groupValues[1]
+                val target = generateSequence(0) { it + 1 }
+                    .map { n -> File(copies, if (n == 0) stamp else "$stamp-moved-$n") }
+                    .first { !it.exists() }
+                if (folder.renameTo(target)) {
+                    Log.i(TAG, "Moved ${folder.path} to ${target.path}")
+                } else {
+                    Log.w(TAG, "Could not move ${folder.path} to ${target.path}; it stays where it is")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Could not gather the earlier copies of ${file.path}; they stay where they are", e)
+        }
     }
 
     private companion object {
