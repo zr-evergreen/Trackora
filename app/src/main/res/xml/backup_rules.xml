@@ -1,13 +1,20 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample backup rules file; uncomment and customize as necessary.
-   See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older than API 31
-   See https://developer.android.com/about/versions/12/backup-restore
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    What Android may copy off the device on Android 7 to 11, to the cloud
+    backup and to a new device alike. Android 12 and later use
+    data_extraction_rules.xml instead; see the reasons there.
+
+    Included: everything not excluded below, which means the database with
+    its -wal, -shm and -journal, the settings in files/datastore/, the theme
+    mirror in shared_prefs/, and the fail-safe's marker, kept on purpose so
+    that a damaged database stays refused wherever it is restored.
+
+    Excluded: the fail-safe's copies, and photos. Photos are left out of
+    transfers to a new device here too: these rules cannot tell the two
+    routes apart without listing every included file, and a transfer on
+    these versions cannot be tested.
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <exclude domain="database" path="trackora_database.damaged-copies" />
+    <exclude domain="external" path="." />
 </full-backup-content>
