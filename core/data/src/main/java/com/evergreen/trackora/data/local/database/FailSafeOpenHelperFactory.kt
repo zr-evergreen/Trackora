@@ -71,8 +71,8 @@ import java.io.File
  * - **The refusal lasts until a person removes the marker,** even after a
  *   false report from failing storage. The user has no way out in the app, and
  *   clearing its storage or uninstalling it deletes the database, the marker
- *   and the copies. Auto Backup carries the marker and copies to a new device,
- *   which then refuses the database too.
+ *   and the copies. Auto Backup carries the marker, but not the copies, to a
+ *   new device, which then refuses the database too.
  * - **An empty or missing database file without a `-wal`** holds nothing, and
  *   a new database is created there. SQLite also discards a hot `-journal`
  *   beside an empty file, which matters only in TRUNCATE journal mode (Room's

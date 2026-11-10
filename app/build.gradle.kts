@@ -157,4 +157,16 @@ dependencies {
     testImplementation(libs.turbine)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+    // BackupRulesRuntimePathsTest opens a TrackoraDatabase; the app itself reaches Room only through core:data.
+    androidTestImplementation(libs.room.runtime)
+}
+
+// BackupRulesTest reads these files itself. Declared as inputs, a change to
+// them reruns the unit tests instead of leaving them up to date.
+tasks.withType<Test>().configureEach {
+    inputs.files(
+        "src/main/AndroidManifest.xml",
+        "src/main/res/xml/data_extraction_rules.xml",
+        "src/main/res/xml/backup_rules.xml",
+    ).withPropertyName("backupRules").withPathSensitivity(PathSensitivity.RELATIVE)
 }

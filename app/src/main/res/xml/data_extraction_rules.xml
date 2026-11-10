@@ -1,19 +1,39 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
-   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    What Android may copy off the device on Android 12 and later: to the
+    user's cloud backup, and to a new device during setup. Android 11 and
+    lower use backup_rules.xml instead.
+
+    Anything not excluded below is included:
+    - the database, trackora_database, with its -wal, -shm and -journal;
+    - the settings, in files/datastore/ (settings_prefs, theme_prefs and
+      locale_prefs .preferences_pb);
+    - the theme mirror, shared_prefs/launch_theme.xml;
+    - the fail-safe's marker, trackora_database.damaged. It is kept on
+      purpose: a damaged database must stay refused wherever it is restored.
+      The marker does not stop a cloud backup taken after the damage from
+      replacing the previous one.
+    Android never copies cache/, code_cache/ or no_backup/.
+
+    Excluded:
+    - the fail-safe's copies of a damaged database. They are only useful on
+      the device that made them. Rules cannot use wildcards, which is why
+      the fail-safe keeps every copy in this one fixed folder.
+    - photos, everything in the app's external files folder. The cloud
+      backup is limited to 25 MB per app, and over that Android uploads
+      nothing at all, not even the database. A large set of photos could
+      also make a transfer to a new device fail.
+
+    disableIfNoEncryptionCapabilities is left unset (false): devices without
+    a screen lock still back up.
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <exclude domain="database" path="trackora_database.damaged-copies" />
+        <exclude domain="external" path="." />
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <exclude domain="database" path="trackora_database.damaged-copies" />
+        <exclude domain="external" path="." />
     </device-transfer>
-    -->
 </data-extraction-rules>
