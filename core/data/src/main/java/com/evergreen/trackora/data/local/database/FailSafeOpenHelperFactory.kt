@@ -179,7 +179,8 @@ private class Damage(private val file: File?) {
     /**
      * Records that the database at [path] is damaged: the marker first, so
      * that the refusal survives even if the copies do not fit on a full disk,
-     * then a copy of each of its files as they are now, which may already have
+     * then [DatabaseDamage], which tells the app at once, even if the marker
+     * could not be written, then a copy of each of its files as they are now, which may already have
      * had their `-wal` merged (see [FailSafeOpenHelperFactory]). Nothing is
      * deleted, moved or overwritten here, and a failure here changes nothing
      * else. The copies are not atomic and are not retried.
@@ -205,6 +206,9 @@ private class Damage(private val file: File?) {
         } catch (e: Exception) {
             Log.e(TAG, "Could not write the corruption marker for $path", e)
         }
+        // At once, before the copies, so the app can put its recovery screen
+        // in place of every other screen while they are being made.
+        DatabaseDamage.recorded(file)
 
         try {
             folder.mkdirs()

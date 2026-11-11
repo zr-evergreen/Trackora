@@ -32,12 +32,17 @@ import kotlin.random.Random
  * all of these hold, and stays otherwise:
  *
  * - the database file is not empty and starts with SQLite's header;
+ * - its `-wal`, if any, holds nothing SQLite would leave unread except
+ *   proven leftovers from before a reset (see [WalCheck]): SQLite drops
+ *   every transaction after a damaged frame without a word;
  * - `PRAGMA integrity_check` returns exactly one row, `ok`;
  * - `user_version`, Room's identity hash and the columns of `work_entries`
  *   are exactly those of a schema this app has shipped, and the database
  *   holds no table, view, trigger or index this app did not create (see
  *   [RecheckRules]);
  * - the files are unchanged, by size and SHA-256, since they were copied.
+ *   They are compared before any result is given, so a change during the
+ *   check is reported as one, never as damage.
  *
  * Lifting it moves the marker; nothing is deleted. A new folder inside the
  * copies folder ([DAMAGED_COPIES_SUFFIX]) gets a note of what was checked,
@@ -86,7 +91,7 @@ class DatabaseRecheck internal constructor(
     }
 
     enum class Reason {
-        EMPTY_OR_MISSING, NOT_A_DATABASE, DAMAGED, UNKNOWN_SCHEMA,
+        EMPTY_OR_MISSING, NOT_A_DATABASE, DAMAGED, UNVERIFIED_WAL, UNKNOWN_SCHEMA,
         UNSUPPORTED_FILES, NOT_ENOUGH_SPACE, FILES_CHANGED, STORAGE_ERROR,
     }
 
@@ -117,7 +122,7 @@ class DatabaseRecheck internal constructor(
         val copyFolder = newCopyFolder()
             ?: return Outcome.NotChecked(Reason.STORAGE_ERROR, "Could not create a folder for the copy")
         val snapshot: Map<String, Fingerprint>
-        val verdict: Verdict
+        val finding: Finding
         try {
             snapshot = try {
                 copy(files, copyFolder)
@@ -126,13 +131,28 @@ class DatabaseRecheck internal constructor(
             } ?: return Outcome.NotChecked(Reason.FILES_CHANGED, "The database changed while it was being copied")
             reached(Step.SNAPSHOT_TAKEN)
 
-            verdict = try {
-                RecheckRules.decide(readFacts(File(copyFolder, database.name)))
-            } catch (e: SQLiteException) {
-                return when (e) {
-                    is SQLiteDiskIOException, is SQLiteFullException, is SQLiteCantOpenDatabaseException ->
-                        Outcome.NotChecked(Reason.STORAGE_ERROR, "Could not read the copy: ${e.message}")
-                    else -> Outcome.StillRefused(Reason.DAMAGED, "SQLite could not read the copy: ${e.message}")
+            val copy = File(copyFolder, database.name)
+            // Before SQLite opens the copy, which applies its -wal and removes it.
+            val wal = try {
+                WalCheck.check(File(copy.path + "-wal"), WalCheck.pageSizeOf(copy) ?: 0)
+            } catch (e: IOException) {
+                return Outcome.NotChecked(Reason.STORAGE_ERROR, "Could not read the copy's -wal: ${e.message}")
+            }
+            finding = if (wal is WalCheck.Result.Unverified) {
+                Finding.Refuse(Reason.UNVERIFIED_WAL, wal.reason)
+            } else {
+                try {
+                    when (val verdict = RecheckRules.decide(readFacts(copy))) {
+                        is Verdict.Sound -> Finding.Lift(verdict.schema, wal)
+                        is Verdict.Damaged -> Finding.Refuse(Reason.DAMAGED, verdict.problems.joinToString("; "))
+                        is Verdict.UnknownSchema -> Finding.Refuse(Reason.UNKNOWN_SCHEMA, verdict.reason)
+                    }
+                } catch (e: SQLiteException) {
+                    when (e) {
+                        is SQLiteDiskIOException, is SQLiteFullException, is SQLiteCantOpenDatabaseException ->
+                            return Outcome.NotChecked(Reason.STORAGE_ERROR, "Could not read the copy: ${e.message}")
+                        else -> Finding.Refuse(Reason.DAMAGED, "SQLite could not read the copy: ${e.message}")
+                    }
                 }
             }
             reached(Step.COPY_CHECKED)
@@ -141,22 +161,30 @@ class DatabaseRecheck internal constructor(
         }
         reached(Step.COPY_REMOVED)
 
-        val schema = when (verdict) {
-            is Verdict.Damaged -> return Outcome.StillRefused(Reason.DAMAGED, verdict.problems.joinToString("; "))
-            is Verdict.UnknownSchema -> return Outcome.StillRefused(Reason.UNKNOWN_SCHEMA, verdict.reason)
-            is Verdict.Sound -> verdict.schema
+        // What the copy showed holds only for files that are still as copied.
+        // A file changed during the copy can make a sound database look
+        // damaged, so this is checked before any finding is reported.
+        if (!unchanged(snapshot)) {
+            return Outcome.NotChecked(Reason.FILES_CHANGED, "The database changed while it was being checked")
         }
-        return liftRefusal(snapshot, schema)
+        return when (finding) {
+            is Finding.Refuse -> Outcome.StillRefused(finding.reason, finding.detail)
+            is Finding.Lift -> liftRefusal(snapshot, finding.schema, finding.wal)
+        }
+    }
+
+    /** What the copy showed, before the files are compared again. */
+    private sealed interface Finding {
+        data class Lift(val schema: Schema, val wal: WalCheck.Result) : Finding
+        data class Refuse(val reason: Reason, val detail: String) : Finding
     }
 
     /**
      * Moves the marker into a new folder of its own, after a note of what was
-     * checked, and only if the files are still those that were checked.
+     * checked, and only if the files are still those that were checked: they
+     * are compared once more, just before the marker moves.
      */
-    private fun liftRefusal(snapshot: Map<String, Fingerprint>, schema: Schema): Outcome {
-        if (!unchanged(snapshot)) {
-            return Outcome.NotChecked(Reason.FILES_CHANGED, "The database changed after it was copied")
-        }
+    private fun liftRefusal(snapshot: Map<String, Fingerprint>, schema: Schema, wal: WalCheck.Result): Outcome {
         val copies = File(database.path + DAMAGED_COPIES_SUFFIX)
         copies.mkdirs()
         val stamp = now()
@@ -172,7 +200,7 @@ class DatabaseRecheck internal constructor(
         try {
             val written = File(folder, "$NOTE.tmp")
             FileOutputStream(written).use { out ->
-                out.write(note(stamp, snapshot, schema).toByteArray(Charsets.UTF_8))
+                out.write(note(stamp, snapshot, schema, wal).toByteArray(Charsets.UTF_8))
                 out.fd.sync()
             }
             if (!written.renameTo(File(folder, NOTE))) throw IOException("Could not name the note")
@@ -183,7 +211,7 @@ class DatabaseRecheck internal constructor(
         reached(Step.NOTE_WRITTEN)
 
         if (!unchanged(snapshot)) {
-            return Outcome.NotChecked(Reason.FILES_CHANGED, "The database changed after it was copied")
+            return Outcome.NotChecked(Reason.FILES_CHANGED, "The database changed while it was being checked")
         }
         val moved = File(folder, marker.name)
         if (moved.exists() || !marker.renameTo(moved)) {
@@ -191,6 +219,7 @@ class DatabaseRecheck internal constructor(
         }
         syncFolder(database.parentFile)
         syncFolder(folder)
+        DatabaseDamage.lifted(database)
         reached(Step.MARKER_MOVED)
         Log.i(TAG, "${database.path} passed its recheck; the marker was moved to ${moved.path}")
         return Outcome.Cleared(folder, schema.version)
@@ -320,15 +349,22 @@ class DatabaseRecheck internal constructor(
         if (owned) folder.deleteRecursively() else Log.e(TAG, "Not removing ${folder.path}: not a copy this check made")
     }
 
-    private fun note(stamp: Long, snapshot: Map<String, Fingerprint>, schema: Schema): String {
+    private fun note(stamp: Long, snapshot: Map<String, Fingerprint>, schema: Schema, wal: WalCheck.Result): String {
         val time = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
             .apply { timeZone = TimeZone.getTimeZone("UTC") }
             .format(Date(stamp))
         val files = snapshot.entries.joinToString("\n") { (name, f) -> "  $name  ${f.size} bytes  sha256 ${f.sha256}" }
+        val walLine = when (wal) {
+            is WalCheck.Result.Verified ->
+                "-wal: ${wal.frames} frames; SQLite reads ${wal.validFrames}, up to the last commit at frame ${wal.committedFrames}; " +
+                    "${wal.leftoverFrames} leftover frames from before a reset" + (if (wal.partialBytes > 0) ", and ${wal.partialBytes} bytes of one" else "")
+            else -> "-wal: none"
+        }
         return """
             |Trackora checked this database again at $time ($stamp ms) and found it sound.
             |
             |PRAGMA integrity_check: ok
+            |$walLine
             |Schema: version ${schema.version}, Room identity hash ${schema.identityHash}, user_version ${schema.version}
             |Files checked, unchanged since they were copied for the check:
             |$files

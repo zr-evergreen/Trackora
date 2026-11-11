@@ -188,6 +188,7 @@ class DatabaseRecheckTest {
 
         val note = File(outcome.folder, DatabaseRecheck.NOTE).readText()
         assertTrue(note, note.contains("PRAGMA integrity_check: ok"))
+        assertTrue(note, note.contains("\n-wal: "))
         assertTrue(note, note.contains("Schema: version $schemaVersion, Room identity hash ${KnownSchemas.byVersion.getValue(schemaVersion).identityHash}"))
         assertTrue(note, note.contains("does not prove that every entry is"))
         before.forEach { (fileName, content) ->
@@ -219,6 +220,7 @@ class DatabaseRecheckTest {
         assertEquals("The refused app changed the files", before, liveFiles())
 
         assertCleared(before, recheck().run(), schemaVersion = 2)
+        assertTrue("Not known as lifted in this process", DatabaseDamage.wasLiftedInThisProcess(file))
 
         val titles = entries().map { it.title }
         assertEquals((1..5).map { entry(it).title } + (0 until 3).map { entry(1_000 + it).title }, titles)
@@ -468,6 +470,87 @@ class DatabaseRecheckTest {
         }
     }
 
+    /**
+     * A damaged frame in the -wal: SQLite would read the frames before it and
+     * silently drop every transaction after it, while integrity_check on the
+     * rest still says "ok". The refusal stays.
+     */
+    @Test
+    fun aWalWithADamagedFrameKeepsTheRefusal() {
+        createCrashImage(saved = 5, unsaved = 6)
+        val wal = File(file.path + "-wal")
+        val frameSize = 24 + readOnly("PRAGMA page_size")
+        assertTrue("The test needs at least 4 frames", wal.length() >= 32 + 4L * frameSize)
+        // Frame 3's page: the frames after it, committed, would be lost.
+        RandomAccessFile(wal, "rw").use { f ->
+            val at = 32L + 2 * frameSize + 24 + 100
+            f.seek(at); val b = f.read(); f.seek(at); f.write(b xor 0x5A)
+        }
+        refuse()
+        val before = liveFiles()
+
+        val outcome = recheck().run()
+
+        assertEquals(outcome.toString(), Reason.UNVERIFIED_WAL, (outcome as? Outcome.StillRefused)?.reason)
+        assertKept(before, outcome)
+    }
+
+    /**
+     * The copy can look damaged because a file was changing while it was
+     * copied. The files are compared before any finding is reported, so that
+     * is reported as a change, and the user is asked to try again; only
+     * unchanged files are reported as damaged. The refusal stays either way.
+     */
+    @Test
+    fun aCopyThatLooksDamagedWhileTheFilesChangedIsReportedAsAChange() {
+        fun tearTheCopy(fileName: String, offset: Long) {
+            val copy = File(work.listFiles()!!.single(), fileName)
+            RandomAccessFile(copy, "rw").use { f -> f.seek(offset); f.write(ByteArray(512) { 0xAB.toByte() }) }
+        }
+        // The entries' first page torn in the copy of a database with no -wal:
+        // its header, so SQLite cannot miss it.
+        createWithEntries(50)
+        val root = readOnly("SELECT rootpage FROM sqlite_master WHERE name = 'work_entries'")
+        val pageSize = readOnly("PRAGMA page_size")
+        listOf(true, false).forEach { liveChanged ->
+            refuse()
+            var before = liveFiles()
+            val outcome = recheck(reached = { step ->
+                if (step != Step.SNAPSHOT_TAKEN) return@recheck
+                tearTheCopy(name, (root - 1L) * pageSize)
+                if (liveChanged) File(file.path + "-journal").writeBytes(ByteArray(0))
+                before = liveFiles()
+            }).run()
+            val expected = if (liveChanged) Reason.FILES_CHANGED else Reason.DAMAGED
+            assertEquals("live changed=$liveChanged: $outcome", expected, outcome.reasonOrNull())
+            assertTrue(marker.exists())
+            assertEquals(before, liveFiles())
+            assertNoCopiesLeft()
+            File(file.path + "-journal").delete()
+        }
+
+        // A -wal frame torn in the copy while the live -wal grew.
+        deleteTestFiles()
+        createCrashImage(saved = 3, unsaved = 4)
+        refuse()
+        var before = liveFiles()
+        val outcome = recheck(reached = { step ->
+            if (step != Step.SNAPSHOT_TAKEN) return@recheck
+            tearTheCopy("$name-wal", 32L + 24 + 100)
+            File(file.path + "-wal").appendBytes(byteArrayOf(1))
+            before = liveFiles()
+        }).run()
+        assertEquals(outcome.toString(), Reason.FILES_CHANGED, outcome.reasonOrNull())
+        assertTrue(marker.exists())
+        assertEquals(before, liveFiles())
+    }
+
+    private fun Outcome.reasonOrNull(): Reason? = when (this) {
+        is Outcome.StillRefused -> reason
+        is Outcome.NotChecked -> reason
+        else -> null
+    }
+
     // ---- Interruptions -------------------------------------------------------
 
     /**
@@ -561,6 +644,7 @@ class DatabaseRecheckTest {
         try {
             assertFalse(DatabaseDamage.isRefused(context))
             assertFalse(DatabaseDamage.isRefusedUntilRestart(context))
+            assertFalse(DatabaseDamage.refusal(context).value)
             assertEquals(null, DatabaseDamage.recordedAt(context))
             assertEquals(Outcome.NotRefused, DatabaseRecheck(context).run())
 
@@ -568,12 +652,14 @@ class DatabaseRecheckTest {
             appMarker.writeText("test")
             assertTrue(DatabaseDamage.isRefused(context))
             assertTrue(DatabaseDamage.isRefusedUntilRestart(context))
+            assertTrue(DatabaseDamage.refusal(context).value)
             assertEquals(appMarker.lastModified(), DatabaseDamage.recordedAt(context))
             assertFalse(context.getDatabasePath(TrackoraDatabase.DATABASE_NAME).exists())
 
             assertTrue(appMarker.delete())
             assertFalse(DatabaseDamage.isRefused(context))
             assertTrue("Lifted before the process restarted", DatabaseDamage.isRefusedUntilRestart(context))
+            assertTrue(DatabaseDamage.refusal(context).value)
         } finally {
             appMarker.delete()
         }
