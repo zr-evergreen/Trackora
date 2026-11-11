@@ -122,17 +122,37 @@ class WalCheckRealSqliteTest {
         assertEquals(result.validFrames, result.committedFrames)
     }
 
+    /**
+     * Killed in the middle of a transaction that spilled pages into the WAL:
+     * frames after the last commit, never committed, and SQLite reads every
+     * committed row. SQLite before 3.11 (Android 7) only appends such frames,
+     * and they all chain: verified. From 3.11 on, SQLite also rewrites a
+     * frame of the unfinished transaction in place and fixes its checksum only
+     * at commit, so the frames after it no longer chain: refused, by design,
+     * because nothing in the file tells them apart from a last commit whose
+     * header was destroyed.
+     */
     @Test
-    fun anUnfinishedTransactionAfterTheCommitsIsVerified() {
+    fun anUnfinishedTransactionAfterTheCommits() {
         val db = open("unfinished")
         insert(db, 20)
+        val version = db.rawQuery("SELECT sqlite_version()", null).use { it.moveToFirst(); it.getString(0) }
+        val (major, minor) = version.split(".").map(String::toInt)
         db.beginTransaction()
         try {
             smallCache(db, 2)
             insert(db, 200, size = 3000) // spills uncommitted frames into the WAL
             val image = image("unfinished")
-            val result = assertVerified(image, 20, "unfinished transaction")
-            assertTrue("No uncommitted frames: $result", result.validFrames > result.committedFrames)
+            assertEquals("SQLite $version lost committed rows", 20, rows(image))
+            val result = walCheck(image)
+            if (major == 3 && minor < 11) {
+                assertTrue("SQLite $version: expected Verified, was $result", result is Result.Verified)
+                result as Result.Verified
+                assertTrue("No uncommitted frames: $result", result.validFrames > result.committedFrames)
+            } else {
+                assertTrue("SQLite $version: expected the rewritten frame refused, was $result", result is Result.Unverified)
+                assertTrue(result.toString(), (result as Result.Unverified).reason.contains("current salt"))
+            }
         } finally {
             db.endTransaction()
             db.close()

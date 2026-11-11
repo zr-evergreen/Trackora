@@ -32,9 +32,11 @@ import java.io.RandomAccessFile
  * because the file was cut exactly at a frame boundary, or because they never
  * reached storage (a power cut under `synchronous=NORMAL`). And some sound
  * files are refused: the frames of a transaction that was rolled back after
- * spilling into the WAL, or of one cut short while a frame was being written,
- * are frames SQLite rightly ignores, but nothing in the file proves they were
- * never committed.
+ * spilling into the WAL, or of one cut short while a frame was being written
+ * or while one of its frames had been rewritten in place (SQLite 3.11 and
+ * later, Android 8 on, fix such a frame's checksum only at commit), are
+ * frames SQLite rightly ignores, but nothing in the file tells them apart
+ * from a last commit whose header was destroyed.
  */
 internal object WalCheck {
 
