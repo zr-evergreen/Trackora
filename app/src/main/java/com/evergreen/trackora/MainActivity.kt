@@ -22,9 +22,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
+import com.evergreen.trackora.data.local.database.DatabaseDamage
 import com.evergreen.trackora.locale.LocaleManager
 import com.evergreen.trackora.navigation.NavGraph
 import com.evergreen.trackora.navigation.TodayRoute
+import com.evergreen.trackora.recovery.AppRestart
+import com.evergreen.trackora.recovery.RecoveryRoute
 import com.evergreen.trackora.ui.theme.TrackoraMotion
 import com.evergreen.trackora.ui.theme.TrackoraTheme
 import com.evergreen.trackora.theme.ThemeManager
@@ -59,6 +62,15 @@ class MainActivity : AppCompatActivity() {
         }
         requestNotificationPermissionIfNeeded()
 
+        // Whether the fail-safe refused the database, read from its marker
+        // without opening anything. Every screen of the app needs the
+        // database, so a refused one gets the recovery screen instead, and
+        // none of those screens is created. Once refused, the answer holds
+        // until the process restarts, also for this activity recreated by a
+        // rotation after the refusal was lifted: this process may still
+        // remember the refusal.
+        val refused = DatabaseDamage.isRefusedUntilRestart(this)
+
         enableEdgeToEdge()
         setContent {
             TrackoraTheme {
@@ -66,11 +78,15 @@ class MainActivity : AppCompatActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    val navController = rememberNavController()
-                    NavGraph(
-                        navController = navController,
-                        startDestination = TodayRoute
-                    )
+                    if (refused) {
+                        RecoveryRoute(onRestart = { AppRestart.restart(this@MainActivity) })
+                    } else {
+                        val navController = rememberNavController()
+                        NavGraph(
+                            navController = navController,
+                            startDestination = TodayRoute
+                        )
+                    }
                 }
             }
         }

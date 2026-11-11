@@ -40,4 +40,22 @@
     <string name="action_for_entry">%1$s، %2$s</string>
     <!-- Read with an entry card that has a photo, in place of its small photo icon. -->
     <string name="work_has_photo">عکس پیوست شده</string>
+
+    <!-- Recovery: the full screen shown instead of the app while the database is refused. -->
+    <string name="recovery_title">ترکورا دفتر کار شما را متوقف کرده است</string>
+    <string name="recovery_body_paused">ترکورا در پایگاه داده‌اش مشکلی پیدا کرد و استفاده از آن را متوقف کرد تا هیچ‌کدام از کارهای ثبت‌شده‌ی شما از بین نرود یا بازنویسی نشود.</string>
+    <string name="recovery_body_kept">هیچ چیزی پاک نشده است. پایگاه داده همان‌طور که هست روی این گوشی نگه داشته شده، همراه با نسخه‌هایی که هنگام پیدا شدن مشکل از آن گرفته شد.</string>
+    <!-- %1$s: the date, in the calendar the language uses. -->
+    <string name="recovery_recorded_on">تاریخ پیدا شدن مشکل: %1$s</string>
+    <string name="recovery_check_again">بررسی دوباره‌ی پایگاه داده</string>
+    <string name="recovery_checking">در حال بررسی…</string>
+    <string name="recovery_check_limits">قبول شدن در این بررسی یعنی ساختار فایل پایگاه داده سالم است. این بررسی نمی‌تواند ثابت کند که همه‌ی کارهای ثبت‌شده کامل و درست هستند.</string>
+    <string name="recovery_passed_title">پایگاه داده بررسی را با موفقیت گذراند</string>
+    <string name="recovery_passed_body">برای باز کردن آن، ترکورا باید دوباره راه‌اندازی شود.</string>
+    <string name="recovery_restart">راه‌اندازی دوباره‌ی ترکورا</string>
+    <string name="recovery_restart_fallback">اگر ترکورا خودش دوباره باز نشد، آن را از صفحه‌ی اصلی گوشی باز کنید.</string>
+    <string name="recovery_failed_damaged">پایگاه داده هنوز مشکل دارد، برای همین ترکورا آن را همچنان متوقف نگه می‌دارد. چیزی تغییر نکرد.</string>
+    <string name="recovery_failed_space">فضای خالی کافی برای بررسی پایگاه داده نیست. کمی فضا آزاد کنید و دوباره امتحان کنید.</string>
+    <string name="recovery_failed_changed">پایگاه داده هنگام بررسی تغییر کرد. دوباره امتحان کنید.</string>
+    <string name="recovery_failed_other">بررسی کامل نشد. چیزی تغییر نکرد.</string>
 </resources>

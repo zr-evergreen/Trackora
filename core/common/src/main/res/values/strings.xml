@@ -53,4 +53,22 @@
     <string name="action_for_entry">%1$s, %2$s</string>
     <!-- Read with an entry card that has a photo, in place of its small photo icon. -->
     <string name="work_has_photo">Photo attached</string>
+
+    <!-- Recovery: the full screen shown instead of the app while the database is refused. -->
+    <string name="recovery_title">Trackora has paused your work log</string>
+    <string name="recovery_body_paused">Trackora found a problem in its database and stopped using it, so that none of your work is lost or written over.</string>
+    <string name="recovery_body_kept">Nothing has been deleted. The database is kept on this phone as it is, along with copies made when the problem was found.</string>
+    <!-- %1$s: the date, in the calendar the language uses. -->
+    <string name="recovery_recorded_on">Problem found on %1$s</string>
+    <string name="recovery_check_again">Check the database again</string>
+    <string name="recovery_checking">Checking…</string>
+    <string name="recovery_check_limits">A passing check means the database file is structurally sound. It can\'t prove that every entry is complete or correct.</string>
+    <string name="recovery_passed_title">The database passed the check</string>
+    <string name="recovery_passed_body">Trackora needs to restart to open it.</string>
+    <string name="recovery_restart">Restart Trackora</string>
+    <string name="recovery_restart_fallback">If Trackora doesn\'t open again by itself, open it from your home screen.</string>
+    <string name="recovery_failed_damaged">The database still has problems, so Trackora keeps it paused. Nothing was changed.</string>
+    <string name="recovery_failed_space">There isn\'t enough free storage to check the database. Free up some space and try again.</string>
+    <string name="recovery_failed_changed">The database changed while it was being checked. Try again.</string>
+    <string name="recovery_failed_other">The check couldn\'t be completed. Nothing was changed.</string>
 </resources>
