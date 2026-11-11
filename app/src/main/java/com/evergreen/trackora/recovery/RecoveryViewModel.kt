@@ -31,9 +31,11 @@ class RecoveryViewModel @Inject constructor(
 ) : ViewModel() {
 
     // Passed already when the refusal was lifted earlier in this process, and
-    // this screen was opened again before the restart.
+    // this screen was opened again before the restart. Not merely because the
+    // marker is missing: the fail-safe refuses the database even when it
+    // cannot write one.
     private val _state = MutableStateFlow<RecoveryState>(
-        if (DatabaseDamage.isRefused(context)) RecoveryState.Paused else RecoveryState.Passed
+        if (DatabaseDamage.wasLiftedInThisProcess(context)) RecoveryState.Passed else RecoveryState.Paused
     )
     val state: StateFlow<RecoveryState> = _state.asStateFlow()
 
@@ -42,15 +44,23 @@ class RecoveryViewModel @Inject constructor(
         ?.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate() }
 
     fun checkAgain() {
-        if (_state.value == RecoveryState.Checking || _state.value == RecoveryState.Passed) return
+        // Nothing to check once the refusal is lifted: only the restart is left.
+        if (_state.value == RecoveryState.Checking || _state.value == RecoveryState.Passed ||
+            _state.value == RecoveryState.RestartNotStarted
+        ) return
         _state.value = RecoveryState.Checking
         viewModelScope.launch {
             val outcome = withContext(Dispatchers.IO) { runCatching { DatabaseRecheck(context).run() } }
-            _state.value = outcome.fold(::recoveryStateFor) { e ->
+            _state.value = outcome.fold({ recoveryStateFor(it, DatabaseDamage.wasLiftedInThisProcess(context)) }) { e ->
                 Log.e(TAG, "The database recheck could not finish", e)
                 RecoveryState.NotPassed(RecoveryState.Why.NOT_COMPLETED)
             }
         }
+    }
+
+    /** The restart could not be asked for: the screen says how to close and reopen the app. */
+    fun restartNotStarted() {
+        _state.value = RecoveryState.RestartNotStarted
     }
 
     private companion object {
@@ -59,10 +69,13 @@ class RecoveryViewModel @Inject constructor(
 }
 
 /** What the recovery screen shows for each way the recheck can end. */
-internal fun recoveryStateFor(outcome: DatabaseRecheck.Outcome): RecoveryState = when (outcome) {
-    // No marker left means an earlier check already lifted the refusal: the
-    // app only needs to restart, exactly as after this one.
-    DatabaseRecheck.Outcome.NotRefused, is DatabaseRecheck.Outcome.Cleared -> RecoveryState.Passed
+internal fun recoveryStateFor(outcome: DatabaseRecheck.Outcome, liftedInThisProcess: Boolean): RecoveryState = when (outcome) {
+    is DatabaseRecheck.Outcome.Cleared -> RecoveryState.Passed
+    // No marker: lifted by an earlier check in this process, which only needs
+    // the restart. Otherwise the fail-safe refused the database without
+    // managing to write its marker, and nothing was checked.
+    DatabaseRecheck.Outcome.NotRefused ->
+        if (liftedInThisProcess) RecoveryState.Passed else RecoveryState.NotPassed(RecoveryState.Why.NOT_COMPLETED)
     is DatabaseRecheck.Outcome.StillRefused -> RecoveryState.NotPassed(RecoveryState.Why.STILL_DAMAGED)
     is DatabaseRecheck.Outcome.NotChecked -> RecoveryState.NotPassed(
         when (outcome.reason) {

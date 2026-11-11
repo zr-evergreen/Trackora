@@ -121,13 +121,30 @@ class RecoveryScreenTest {
     }
 
     @Test
+    fun aRestartThatCouldNotBeAskedForSaysHowToReopenTheApp() {
+        state = RecoveryState.RestartNotStarted
+        show()
+
+        assertShown(R.string.recovery_passed_title)
+        assertShown(R.string.recovery_restart_not_started)
+        composeRule.onNodeWithTag(RecoveryRestartNotStartedTag).assertExists()
+        // Nothing here claims the app restarted.
+        assertNotShown(R.string.recovery_passed_body)
+        composeRule.onNodeWithTag(RecoveryCheckButtonTag).assertDoesNotExist()
+        // The restart can still be tried again.
+        composeRule.onNodeWithTag(RecoveryRestartButtonTag).performScrollTo().performClick()
+        assertEquals(1, restarts)
+        assertEquals(0, checks)
+    }
+
+    @Test
     fun everyStringHasItsOwnPersianText() {
         val persian = context.createConfigurationContext(Configuration(context.resources.configuration).apply { setLocale(Locale("fa")) })
         val english = context.createConfigurationContext(Configuration(context.resources.configuration).apply { setLocale(Locale.ENGLISH) })
         val ids = listOf(
             R.string.recovery_title, R.string.recovery_body_paused, R.string.recovery_body_kept, R.string.recovery_recorded_on,
             R.string.recovery_check_again, R.string.recovery_checking, R.string.recovery_check_limits,
-            R.string.recovery_passed_title, R.string.recovery_passed_body, R.string.recovery_restart, R.string.recovery_restart_fallback,
+            R.string.recovery_passed_title, R.string.recovery_passed_body, R.string.recovery_restart, R.string.recovery_restart_fallback, R.string.recovery_restart_not_started,
             R.string.recovery_failed_damaged, R.string.recovery_failed_space, R.string.recovery_failed_changed, R.string.recovery_failed_other,
         )
         ids.forEach { id ->

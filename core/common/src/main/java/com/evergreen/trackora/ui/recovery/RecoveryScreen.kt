@@ -41,6 +41,9 @@ sealed interface RecoveryState {
     /** The check passed and the refusal was lifted; the app must restart to open the database. */
     data object Passed : RecoveryState
 
+    /** The check passed, but the restart could not be asked for: the app must be closed and reopened by hand. */
+    data object RestartNotStarted : RecoveryState
+
     /** The check did not pass, or could not finish. The database is still refused. */
     data class NotPassed(val why: Why) : RecoveryState
 
@@ -50,6 +53,7 @@ sealed interface RecoveryState {
 const val RecoveryScreenTag = "recovery_screen"
 const val RecoveryCheckButtonTag = "recovery_check"
 const val RecoveryRestartButtonTag = "recovery_restart"
+const val RecoveryRestartNotStartedTag = "recovery_restart_not_started"
 
 /**
  * Shown instead of the whole app while the database is refused: what has
@@ -97,13 +101,22 @@ fun RecoveryScreen(
         Spacer(Modifier.height(8.dp))
 
         when (state) {
-            RecoveryState.Passed -> {
+            RecoveryState.Passed, RecoveryState.RestartNotStarted -> {
                 Text(
                     text = stringResource(R.string.recovery_passed_title),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary,
                 )
-                Text(stringResource(R.string.recovery_passed_body), style = MaterialTheme.typography.bodyLarge)
+                if (state == RecoveryState.RestartNotStarted) {
+                    Text(
+                        text = stringResource(R.string.recovery_restart_not_started),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.testTag(RecoveryRestartNotStartedTag),
+                    )
+                } else {
+                    Text(stringResource(R.string.recovery_passed_body), style = MaterialTheme.typography.bodyLarge)
+                }
                 Button(
                     onClick = onRestart,
                     modifier = Modifier.fillMaxWidth().testTag(RecoveryRestartButtonTag),

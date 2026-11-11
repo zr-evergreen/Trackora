@@ -17,15 +17,23 @@ class RecoveryStateTest {
 
     @Test
     fun aLiftedRefusalOffersARestart() {
-        assertEquals(RecoveryState.Passed, recoveryStateFor(Outcome.Cleared(File("copies/1-cleared"), 2)))
-        // Lifted by an earlier check whose restart did not happen.
-        assertEquals(RecoveryState.Passed, recoveryStateFor(Outcome.NotRefused))
+        listOf(true, false).forEach { lifted ->
+            assertEquals(RecoveryState.Passed, recoveryStateFor(Outcome.Cleared(File("copies/1-cleared"), 2), lifted))
+        }
+        // Lifted by an earlier check in this process whose restart did not happen.
+        assertEquals(RecoveryState.Passed, recoveryStateFor(Outcome.NotRefused, liftedInThisProcess = true))
+    }
+
+    @Test
+    fun noMarkerWithoutALiftIsNotAPass() {
+        // The fail-safe refused the database but could not write its marker: nothing was checked.
+        assertEquals(RecoveryState.NotPassed(Why.NOT_COMPLETED), recoveryStateFor(Outcome.NotRefused, liftedInThisProcess = false))
     }
 
     @Test
     fun aDatabaseStillRefusedSaysSoWhateverTheReason() {
         Reason.entries.forEach { reason ->
-            assertEquals(reason.name, RecoveryState.NotPassed(Why.STILL_DAMAGED), recoveryStateFor(Outcome.StillRefused(reason, "")))
+            assertEquals(reason.name, RecoveryState.NotPassed(Why.STILL_DAMAGED), recoveryStateFor(Outcome.StillRefused(reason, ""), false))
         }
     }
 
@@ -39,7 +47,7 @@ class RecoveryStateTest {
             }
         }
         expected.forEach { (reason, why) ->
-            assertEquals(reason.name, RecoveryState.NotPassed(why), recoveryStateFor(Outcome.NotChecked(reason, "")))
+            assertEquals(reason.name, RecoveryState.NotPassed(why), recoveryStateFor(Outcome.NotChecked(reason, ""), false))
         }
     }
 }

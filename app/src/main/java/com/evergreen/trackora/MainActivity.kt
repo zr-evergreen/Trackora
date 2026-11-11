@@ -20,6 +20,8 @@ import androidx.lifecycle.lifecycleScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
 import com.evergreen.trackora.data.local.database.DatabaseDamage
@@ -62,14 +64,16 @@ class MainActivity : AppCompatActivity() {
         }
         requestNotificationPermissionIfNeeded()
 
-        // Whether the fail-safe refused the database, read from its marker
-        // without opening anything. Every screen of the app needs the
-        // database, so a refused one gets the recovery screen instead, and
-        // none of those screens is created. Once refused, the answer holds
-        // until the process restarts, also for this activity recreated by a
-        // rotation after the refusal was lifted: this process may still
-        // remember the refusal.
-        val refused = DatabaseDamage.isRefusedUntilRestart(this)
+        // Whether the fail-safe refused the database: read from its marker
+        // now, without opening anything, and then signalled by the fail-safe
+        // the moment it refuses the database while the app is running. Every
+        // screen of the app needs the database, so a refused one gets the
+        // recovery screen in place of all of them, at once: the screens, their
+        // dialogs and the navigation leave the composition. Once refused, the
+        // answer holds until the process restarts, also for this activity
+        // recreated by a rotation after the refusal was lifted: this process
+        // may still remember the refusal.
+        val refusal = DatabaseDamage.refusal(this)
 
         enableEdgeToEdge()
         setContent {
@@ -78,6 +82,7 @@ class MainActivity : AppCompatActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
+                    val refused by refusal.collectAsState()
                     if (refused) {
                         RecoveryRoute(onRestart = { AppRestart.restart(this@MainActivity) })
                     } else {

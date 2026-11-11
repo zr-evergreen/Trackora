@@ -66,6 +66,7 @@
     <string name="recovery_passed_title">The database passed the check</string>
     <string name="recovery_passed_body">Trackora needs to restart to open it.</string>
     <string name="recovery_restart">Restart Trackora</string>
+    <string name="recovery_restart_not_started">Trackora couldn\'t restart by itself. Close it fully, then open it again from your home screen.</string>
     <string name="recovery_restart_fallback">If Trackora doesn\'t open again by itself, open it from your home screen.</string>
     <string name="recovery_failed_damaged">The database still has problems, so Trackora keeps it paused. Nothing was changed.</string>
     <string name="recovery_failed_space">There isn\'t enough free storage to check the database. Free up some space and try again.</string>

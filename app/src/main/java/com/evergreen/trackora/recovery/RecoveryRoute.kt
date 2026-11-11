@@ -6,10 +6,14 @@ import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.evergreen.trackora.ui.recovery.RecoveryScreen
 
-/** The recovery screen, wired to [RecoveryViewModel]. */
+/**
+ * The recovery screen, wired to [RecoveryViewModel]. [onRestart] returns
+ * false when the restart could not be asked for, and the screen then says how
+ * to close and reopen the app.
+ */
 @Composable
 fun RecoveryRoute(
-    onRestart: () -> Unit,
+    onRestart: () -> Boolean,
     viewModel: RecoveryViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
@@ -17,6 +21,6 @@ fun RecoveryRoute(
         state = state,
         recordedOn = viewModel.recordedOn,
         onCheckAgain = viewModel::checkAgain,
-        onRestart = onRestart,
+        onRestart = { if (!onRestart()) viewModel.restartNotStarted() },
     )
 }
