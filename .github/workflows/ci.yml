@@ -112,6 +112,8 @@ jobs:
       # oldest supported release. Running them on API 34 would pass no matter
       # what, because there java.time is in the platform. The Compose tests for
       # the shared cards and each feature's screens run on the same release.
+      # core:backup reads its frozen example backups here with API 24's zlib
+      # and desugared java.time, and again on API 34 in the job below.
       - name: Run instrumented tests on API 24
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -119,7 +121,7 @@ jobs:
           target: default
           arch: x86_64
           disable-animations: true
-          script: ./gradlew :core:data:connectedDebugAndroidTest :core:common:connectedDebugAndroidTest :feature:addedit:connectedDebugAndroidTest :feature:allwork:connectedDebugAndroidTest :feature:reports:connectedDebugAndroidTest :feature:today:connectedDebugAndroidTest --stacktrace
+          script: ./gradlew :core:data:connectedDebugAndroidTest :core:common:connectedDebugAndroidTest :core:backup:connectedDebugAndroidTest :feature:addedit:connectedDebugAndroidTest :feature:allwork:connectedDebugAndroidTest :feature:reports:connectedDebugAndroidTest :feature:today:connectedDebugAndroidTest --stacktrace
 
       - name: Upload instrumentation reports
         if: always()
@@ -161,6 +163,8 @@ jobs:
       # draw one without an icon; the app used to crash on that one. The app's
       # tests open it behind each kind of splash, which a test can only ask
       # for on Android 13 or later, so on API 24 they would be skipped.
+      # core:backup's tests run here too, so the backup format is read with a
+      # current Android's zlib as well as API 24's.
       - name: Run the app's instrumented tests on API 34
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -168,7 +172,7 @@ jobs:
           target: google_apis
           arch: x86_64
           disable-animations: true
-          script: ./gradlew :app:connectedDebugAndroidTest --stacktrace
+          script: ./gradlew :app:connectedDebugAndroidTest :core:backup:connectedDebugAndroidTest --stacktrace
 
       - name: Upload instrumentation reports
         if: always()
