@@ -159,6 +159,9 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
     // BackupRulesRuntimePathsTest opens a TrackoraDatabase; the app itself reaches Room only through core:data.
     androidTestImplementation(libs.room.runtime)
+    // RecoveryOnDamageTest reads MainActivity's Compose screens.
+    androidTestImplementation(platform(libs.compose.bom))
+    androidTestImplementation(libs.compose.ui.test.junit4)
 }
 
 // BackupRulesTest reads these files itself. Declared as inputs, a change to

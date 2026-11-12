@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!-- RealMarkerRecheckTest opens a database in a process of its own, as a restarted app would. -->
+        <provider
+            android:name="com.evergreen.trackora.data.local.database.FreshProcessProbe"
+            android:authorities="${applicationId}.freshprocess"
+            android:exported="false"
+            android:process=":fresh" />
+    </application>
+
+</manifest>
