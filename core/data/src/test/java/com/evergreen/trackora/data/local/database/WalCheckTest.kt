@@ -90,6 +90,43 @@ class WalCheckTest {
         assertUnverified(check(real().copyOf(offset(2))))
     }
 
+    /** Frames [frames] of [wal] with only their salts changed, all to the same new values; checksums and pages kept. */
+    private fun saltsChanged(wal: ByteArray, frames: IntRange) = wal.copyOf().also { b ->
+        frames.forEach { n -> byteArrayOf(0x11, 0x11, 0x11, 0x11, 0x22, 0x22, 0x22, 0x22).copyInto(b, offset(n, 8)) }
+    }
+
+    /**
+     * Only the salts of the last frames changed: SQLite stops before them and
+     * drops their commits. They still chain with each other, as leftovers do,
+     * but the first continues this WAL's own chain, which a leftover never
+     * does: refused.
+     */
+    @Test
+    fun saltsChangedOnTheLastFramesAreRefused() {
+        listOf(4..5, 3..5).forEach { frames ->
+            val result = check(saltsChanged(real(), frames))
+            assertUnverified(result)
+            assertTrue(result.toString(), (result as Result.Unverified).reason.contains("continues this WAL's checksum chain"))
+        }
+    }
+
+    @Test
+    fun aSaltChangedOnlyOnTheLastFrameIsRefused() {
+        assertUnverified(check(saltsChanged(real(), 5..5)))
+    }
+
+    /**
+     * The limit of the check: if the first of those frames is damaged in its
+     * page too, it no longer continues this WAL's chain, and nothing in the
+     * checksums links the frames to this WAL. Kept as a test so the limit
+     * stays visible.
+     */
+    @Test
+    fun saltsChangedWithTheFirstPageDamagedTooAreNotCaught() {
+        val wal = saltsChanged(real(), 4..5).flip(offset(4, 24 + 100))
+        assertEquals(Result.Verified(frames = 5, validFrames = 3, committedFrames = 3, leftoverFrames = 2, partialBytes = 0), check(wal))
+    }
+
     @Test
     fun aWalCutPartwayThroughAFrameIsRefused() {
         assertUnverified(check(real().copyOf(offset(5, 200))))
@@ -193,6 +230,15 @@ class WalCheckTest {
         val old = Writer(salt1 = 100, salt2 = 0x1234).apply { repeat(10) { frame(it % 5 + 1, commit = if (it % 2 == 1) 5 else 0) } }.bytes()
         val new = Writer(salt1 = 101, salt2 = 0x7777).frame(1, commit = 5).frame(2, commit = 5).frame(3).bytes()
         assertUnverified(check(new + old.copyOfRange(new.size, old.size)))
+    }
+
+    @Test
+    fun saltsChangedOnNewFramesBeforeGenuineLeftoversAreRefused() {
+        // After a reset: the last two new frames take new salts; the genuine
+        // leftovers behind them do not make them leftovers.
+        val wal = afterAReset(10, 3)
+        assertEquals(Result.Verified(10, 3, 3, 7, 0), check(wal))
+        assertUnverified(check(saltsChanged(wal, 2..3)))
     }
 
     @Test

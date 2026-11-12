@@ -30,9 +30,13 @@ import java.io.RandomAccessFile
  *   reset. After a complete checkpoint SQLite writes the WAL again from its
  *   start, with salt-1 incremented and salt-2 randomised, and the older frames
  *   it has not yet overwritten stay in the file, already copied into the
- *   database. A leftover is proven when neither salt is the current one and
- *   its checksum chains with a neighbouring frame of the same older salts,
- *   which damage to either would break.
+ *   database. A leftover is proven when neither salt is the current one, its
+ *   checksum chains with a neighbouring frame of the same older salts, and the
+ *   first of them does not continue this WAL's own checksum chain. The
+ *   checksum does not cover the salts, so frames of this WAL whose salts were
+ *   changed still chain with each other; but they also continue this WAL's
+ *   chain from its last valid frame, which an older WAL's frames, chained from
+ *   a header that is gone, do not.
  * - A file that ends partway through a frame is accepted only when that frame
  *   continues a proven leftover; SQLite's `journal_size_limit` cuts the file
  *   there.
@@ -44,6 +48,13 @@ import java.io.RandomAccessFile
  * because the file was cut exactly after a commit frame (between two
  * transactions, or within a commit's padding), or because they never reached
  * storage (a power cut under `synchronous=NORMAL`).
+ *
+ * What this check does not see: frames of this WAL whose salts were changed,
+ * as above, when the first of them is damaged in its page or checksum too, so
+ * that it no longer continues this WAL's chain. Nothing in the file's
+ * checksums then links them to this WAL, and they pass as leftovers. It takes
+ * the same new salts on two or more frames together with other damage to the
+ * first; random damage practically never does that.
  *
  * And some sound files are refused, whose frames SQLite rightly leaves
  * unapplied but nothing in the file proves were never committed: the frames of
@@ -153,6 +164,20 @@ internal object WalCheck {
                     "Frame $number of the -wal, which SQLite would not read, is not a leftover from before a reset" +
                         if (int(current, 8) == salt1 || int(current, 12) == salt2) " (it has the current salt)" else ""
                 )
+            }
+            // An older WAL's frames chain from a header that is gone. A frame
+            // that continues this WAL's own chain from its last valid frame is
+            // a frame of this WAL whose salts were changed.
+            if (number == valid + 1) {
+                val running = sum.copyOf()
+                checksum(current, 0, 8, bigEndian, running)
+                checksum(current, FRAME_HEADER, pageSize, bigEndian, running)
+                if (running[0] == int(current, 16) && running[1] == int(current, 20)) {
+                    return Result.Unverified(
+                        "Frame $number of the -wal continues this WAL's checksum chain but has other salts: " +
+                            "a frame of this WAL whose salts were changed, not a leftover from before a reset"
+                    )
+                }
             }
             val linked = previous != null && chains(previous, current, pageSize, bigEndian)
             if (previous != null && !previousProven && !linked) {

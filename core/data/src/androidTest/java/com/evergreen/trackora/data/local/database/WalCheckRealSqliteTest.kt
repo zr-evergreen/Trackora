@@ -381,6 +381,34 @@ class WalCheckRealSqliteTest {
         assertEquals("SQLite itself reads every committed row", 11, rows(image))
     }
 
+    /** [frames] with only their salts changed, all to the same new values; checksums and pages kept. */
+    private fun ByteArray.saltsChanged(image: Image, frames: IntRange) = also { b ->
+        frames.forEach { n -> byteArrayOf(0x11, 0x11, 0x11, 0x11, 0x22, 0x22, 0x22, 0x22).copyInto(b, offset(image, n, 8)) }
+    }
+
+    /**
+     * Only the salts of the frames after a commit changed: SQLite stops
+     * before them and drops their commits. They still chain with each other,
+     * as leftovers do, but the first continues this WAL's own chain: refused,
+     * by that check (the frames before them end on a commit).
+     */
+    @Test
+    fun saltsChangedOnTheLastFramesAreRefused() {
+        val image = forty()
+        val start = commitFrames(image).last { it <= frames(image) - 2 } + 1
+        val changed = image.wal { it.saltsChanged(image, start..frames(image)) }
+        val result = walCheck(changed)
+        assertTrue("Expected the chain check to refuse it, was $result",
+            result is Result.Unverified && result.reason.contains("continues this WAL's checksum chain"))
+        assertRefusedAndLosing(changed, 40, "salts of frames $start to ${frames(image)} changed")
+    }
+
+    @Test
+    fun aSaltChangedOnlyOnTheLastFrameIsRefused() {
+        val image = forty()
+        assertRefusedAndLosing(image.wal { it.saltsChanged(image, frames(image)..frames(image)) }, 40, "salt of the last frame changed")
+    }
+
     @Test
     fun aDamagedPageByteIsRefused() {
         val image = forty()
