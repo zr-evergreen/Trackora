@@ -16,10 +16,12 @@ import org.junit.rules.TemporaryFolder
  * The first group starts from a WAL written by SQLite itself (the laptop's
  * SQLite 3.53, page size 512): a table created, then three entries, each in
  * its own transaction, copied while the connection was still open, as a
- * crash leaves it. SQLite reads all five frames and sees the three entries.
- * The second group writes WAL files from the format SQLite documents, for the
- * cases a real file cannot easily be made to show. WalCheckRealSqliteTest
- * checks the same cases against Android's own SQLite on a device.
+ * crash leaves it. SQLite applies all five frames and sees the three entries.
+ * The second uses another WAL SQLite wrote, with the padding it adds after a
+ * commit (resources/wal/padded.wal, see [paddingSqliteWritesAfterACommitIsRead]).
+ * The third writes WAL files from the format SQLite documents, for the cases
+ * a real file cannot easily be made to show. WalCheckRealSqliteTest checks the
+ * same cases against Android's own SQLite on a device.
  */
 class WalCheckTest {
 
@@ -77,6 +79,17 @@ class WalCheckTest {
         assertUnverified(check(real().also { it.fill(0, offset(5), offset(5, 24)) }))
     }
 
+    /**
+     * Frames 1 and 2 are one transaction, the table's creation, and frame 2 is
+     * its commit. Cut after frame 1, as a kill between the two frame writes
+     * leaves it, or a cut that took the commit frame: SQLite would apply
+     * nothing of it, and nothing tells which it was.
+     */
+    @Test
+    fun aCommitCutBeforeItsCommitFrameIsRefused() {
+        assertUnverified(check(real().copyOf(offset(2))))
+    }
+
     @Test
     fun aWalCutPartwayThroughAFrameIsRefused() {
         assertUnverified(check(real().copyOf(offset(5, 200))))
@@ -84,9 +97,9 @@ class WalCheckTest {
     }
 
     /**
-     * The limit no check of the file can pass: cut exactly at a frame
-     * boundary, a WAL looks like a shorter one. SQLite then sees two entries,
-     * not three, and so does this.
+     * The limit no check of the file can pass: cut exactly after a commit
+     * frame, a WAL looks like a shorter one. SQLite then sees two entries, not
+     * three, and so does this.
      */
     @Test
     fun aWalCutAtAFrameBoundaryLooksLikeAShorterOne() {
@@ -118,12 +131,26 @@ class WalCheckTest {
     }
 
     @Test
-    fun severalCommitsAndAnUnfinishedTransactionAreRead() {
+    fun severalCommitsAreRead() {
+        val wal = Writer(salt1 = 7, salt2 = 9).frame(1).frame(2, commit = 3).frame(3, commit = 3).frame(2, commit = 3).bytes()
+        assertEquals(Result.Verified(frames = 4, validFrames = 4, committedFrames = 4, leftoverFrames = 0, partialBytes = 0), check(wal))
+    }
+
+    @Test
+    fun anUnfinishedTransactionAfterTheCommitsIsRefused() {
+        // Valid frames, but the last transaction has no commit frame: SQLite
+        // applies only the first four, and nothing proves the other two were
+        // never committed.
         val wal = Writer(salt1 = 7, salt2 = 9)
             .frame(1).frame(2, commit = 3).frame(3, commit = 3).frame(2, commit = 3)
-            .frame(3).frame(4) // spilled by a transaction that never committed
+            .frame(3).frame(4)
             .bytes()
-        assertEquals(Result.Verified(frames = 6, validFrames = 6, committedFrames = 4, leftoverFrames = 0, partialBytes = 0), check(wal))
+        assertUnverified(check(wal))
+    }
+
+    @Test
+    fun anEmptyWalHeaderIsRead() {
+        assertEquals(Result.Verified(0, 0, 0, 0, 0), check(Writer(salt1 = 5, salt2 = 6).bytes()))
     }
 
     @Test
@@ -150,6 +177,22 @@ class WalCheckTest {
     @Test
     fun leftoversFromBeforeAResetAreProvenAndIgnored() {
         assertEquals(Result.Verified(frames = 10, validFrames = 3, committedFrames = 3, leftoverFrames = 7, partialBytes = 0), check(afterAReset(10, 3)))
+    }
+
+    @Test
+    fun aNewHeaderBeforeItsFirstFrameLeavesOnlyLeftovers() {
+        // A reset wrote the new header, and the process stopped before the
+        // first new frame: every frame is a proven leftover, nothing is lost.
+        val old = Writer(salt1 = 100, salt2 = 0x1234).apply { repeat(10) { frame(it % 5 + 1, commit = if (it % 2 == 1) 5 else 0) } }.bytes()
+        val wal = Writer(salt1 = 101, salt2 = 0x7777).bytes() + old.copyOfRange(32, old.size)
+        assertEquals(Result.Verified(frames = 10, validFrames = 0, committedFrames = 0, leftoverFrames = 10, partialBytes = 0), check(wal))
+    }
+
+    @Test
+    fun anUnfinishedTransactionBeforeLeftoversIsRefused() {
+        val old = Writer(salt1 = 100, salt2 = 0x1234).apply { repeat(10) { frame(it % 5 + 1, commit = if (it % 2 == 1) 5 else 0) } }.bytes()
+        val new = Writer(salt1 = 101, salt2 = 0x7777).frame(1, commit = 5).frame(2, commit = 5).frame(3).bytes()
+        assertUnverified(check(new + old.copyOfRange(new.size, old.size)))
     }
 
     @Test
@@ -197,6 +240,31 @@ class WalCheckTest {
         val wal = Writer(salt1 = 1, salt2 = 2).frame(1).frame(2, commit = 2).bytes()
         val torn = Writer(salt1 = 1, salt2 = 2).frame(1).frame(2, commit = 2).frame(2, commit = 2).bytes().copyOf(wal.size + 100)
         assertUnverified(check(torn))
+    }
+
+    // ---- Padding SQLite writes after a commit --------------------------------
+
+    /**
+     * Written by the laptop's SQLite 3.53 with powersafe overwrite off
+     * (`psow=0`) and `synchronous=FULL`, page size 512: a table created, then
+     * one entry. Each transaction is a frame of page 1, its commit frame, and
+     * six padding frames that repeat the commit frame, commit size included,
+     * up to the 4096-byte sector: 16 frames. SQLite applies all of them and
+     * sees the entry. Android's SQLite keeps powersafe overwrite on and writes
+     * no padding (checked on API 24 to 36), but other builds might.
+     */
+    private fun padded(): ByteArray = javaClass.getResourceAsStream("/wal/padded.wal")!!.use { it.readBytes() }
+
+    @Test
+    fun paddingSqliteWritesAfterACommitIsRead() {
+        val wal = padded()
+        assertEquals(Result.Verified(frames = 16, validFrames = 16, committedFrames = 16, leftoverFrames = 0, partialBytes = 0), check(wal))
+        // Cut anywhere inside a commit's padding: still ends on a commit.
+        (2..8).forEach { frames -> assertEquals(Result.Verified(frames, frames, frames, 0, 0), check(wal.copyOf(offset(frames + 1)))) }
+        (10..16).forEach { frames -> assertEquals(Result.Verified(frames, frames, frames, 0, 0), check(wal.copyOf(offset(frames + 1)))) }
+        // Cut after a transaction's first frame, before its commit frame: refused.
+        assertUnverified(check(wal.copyOf(offset(2))))
+        assertUnverified(check(wal.copyOf(offset(10))))
     }
 
     /** A WAL as the documented format describes it: header, then frames whose checksums chain from it. */

@@ -16,9 +16,11 @@ import org.junit.runner.RunWith
 /**
  * [WalCheck] on WAL files written by this device's own SQLite, each set of
  * files copied while the connection was open, as a crash leaves them. Every
- * case also asks SQLite itself, on a throwaway copy, how many rows it reads:
- * a verified WAL must lose none, and each refused damaged one does lose rows,
- * which is why it is refused.
+ * case also asks SQLite itself, on a throwaway copy, what it reads: a verified
+ * WAL must lose nothing committed. A refused one either does lose committed
+ * rows, which is why it is refused, or holds a transaction without its commit
+ * frame, which SQLite does not apply and which nothing proves was never
+ * committed.
  */
 @RunWith(AndroidJUnit4::class)
 class WalCheckRealSqliteTest {
@@ -40,19 +42,21 @@ class WalCheckRealSqliteTest {
      * connection that writes (Android's own is every 100 frames on some
      * versions), so each test decides when the WAL is reset.
      */
-    private fun open(name: String): SQLiteDatabase {
+    private fun open(name: String, androidsOwnCheckpoints: Boolean = false): SQLiteDatabase {
         folder.mkdirs()
         val db = SQLiteDatabase.openDatabase(
             File(folder, name).path, null,
             SQLiteDatabase.OPEN_READWRITE or SQLiteDatabase.CREATE_IF_NECESSARY or SQLiteDatabase.ENABLE_WRITE_AHEAD_LOGGING,
         )
-        // Inside a transaction, a query runs on the connection that writes.
-        db.beginTransaction()
-        try {
-            pragma(db, "wal_autocheckpoint = 0")
-            db.setTransactionSuccessful()
-        } finally {
-            db.endTransaction()
+        if (!androidsOwnCheckpoints) {
+            // Inside a transaction, a query runs on the connection that writes.
+            db.beginTransaction()
+            try {
+                pragma(db, "wal_autocheckpoint = 0")
+                db.setTransactionSuccessful()
+            } finally {
+                db.endTransaction()
+            }
         }
         db.execSQL("CREATE TABLE IF NOT EXISTS t (id INTEGER PRIMARY KEY, v TEXT)")
         // The table in the database file itself, so every later frame is an entry.
@@ -73,18 +77,69 @@ class WalCheckRealSqliteTest {
 
     private fun pageSize(image: Image) = ((image.db[16].toInt() and 0xff) shl 8) or (image.db[17].toInt() and 0xff)
 
-    private fun walCheck(image: Image): Result =
-        WalCheck.check(File(folder, "checked-wal").apply { writeBytes(image.wal) }, pageSize(image))
+    private fun walCheck(image: Image): Result {
+        folder.mkdirs()
+        return WalCheck.check(File(folder, "checked-wal").apply { writeBytes(image.wal) }, pageSize(image))
+    }
 
     /** The rows SQLite reads from [image], opened on a throwaway copy. */
-    private fun rows(image: Image): Int {
+    private fun rows(image: Image): Int = count(image, "SELECT count(*) FROM t")
+
+    /** The rows SQLite reads from [image] whose value was changed from 'y' to 'z'. */
+    private fun changed(image: Image): Int = count(image, "SELECT count(*) FROM t WHERE instr(v, 'z') > 0")
+
+    private fun count(image: Image, query: String): Int {
         val copy = File(folder, "rows").apply { deleteRecursively(); mkdirs() }
         File(copy, "db").writeBytes(image.db)
         File(copy, "db-wal").writeBytes(image.wal)
         return SQLiteDatabase.openDatabase(File(copy, "db").path, null, SQLiteDatabase.OPEN_READWRITE or SQLiteDatabase.ENABLE_WRITE_AHEAD_LOGGING).use { db ->
-            db.rawQuery("SELECT count(*) FROM t", null).use { it.moveToFirst(); it.getInt(0) }
+            db.rawQuery(query, null).use { it.moveToFirst(); it.getInt(0) }
         }
     }
+
+    /** The numbers of the commit frames in [image]'s WAL. */
+    private fun commitFrames(image: Image): List<Int> = (1..frames(image)).filter { n ->
+        val at = offset(image, n, 4)
+        (0..3).any { image.wal[at + it].toInt() != 0 }
+    }
+
+    /**
+     * Thirty rows of 3000 bytes, one to a page, in the database file itself,
+     * then [commits] commits that each change one row's 'y's to 'z's in
+     * place: one page, one frame each.
+     *
+     * The commits run on a new connection, so its page cache holds none of
+     * the thirty pages: a later change must read each page from the file,
+     * and a small cache then spills it into the WAL. Android's SQLite shares
+     * one page cache budget between all connections of the process, so with
+     * other databases left open (as earlier tests leave refused ones), pages
+     * a connection wrote itself can stay cached, and a change to them never
+     * spills.
+     */
+    private fun thirtyPages(name: String, commits: Int): SQLiteDatabase {
+        val db = open(name)
+        db.beginTransaction()
+        try {
+            repeat(30) { db.execSQL("INSERT INTO t (v) VALUES (?)", arrayOf("row $it " + "y".repeat(3000))) }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+        pragma(db, "wal_checkpoint(TRUNCATE)")
+        db.close()
+        val fresh = SQLiteDatabase.openDatabase(File(folder, name).path, null, SQLiteDatabase.OPEN_READWRITE or SQLiteDatabase.ENABLE_WRITE_AHEAD_LOGGING)
+        fresh.beginTransaction()
+        try {
+            pragma(fresh, "wal_autocheckpoint = 0")
+            fresh.setTransactionSuccessful()
+        } finally {
+            fresh.endTransaction()
+        }
+        repeat(commits) { fresh.execSQL("UPDATE t SET v = replace(v, 'y', 'z') WHERE id = ${it + 1}") }
+        return fresh
+    }
+
+    private fun resource(path: String): ByteArray = javaClass.getResourceAsStream(path)!!.use { it.readBytes() }
 
     private fun frameSize(image: Image) = 24 + pageSize(image)
     private fun frames(image: Image) = (image.wal.size - 32) / frameSize(image)
@@ -107,7 +162,7 @@ class WalCheckRealSqliteTest {
         assertTrue("$label: SQLite still reads all $committedRows rows ($read), so this is not a loss", read < committedRows)
     }
 
-    /** Forty entries, each committed on its own: one frame each. */
+    /** Forty entries, each committed on its own. */
     private fun forty(): Image {
         val db = open("forty")
         insert(db, 40)
@@ -123,40 +178,161 @@ class WalCheckRealSqliteTest {
     }
 
     /**
-     * Killed in the middle of a transaction that spilled pages into the WAL:
-     * frames after the last commit, never committed, and SQLite reads every
-     * committed row. SQLite before 3.11 (Android 7) only appends such frames,
-     * and they all chain: verified. From 3.11 on, SQLite also rewrites a
-     * frame of the unfinished transaction in place and fixes its checksum only
-     * at commit, so the frames after it no longer chain: refused, by design,
-     * because nothing in the file tells them apart from a last commit whose
-     * header was destroyed.
+     * Killed in the middle of a transaction that spilled pages into the WAL,
+     * some of them more than once. SQLite 3.9 (Android 7) only appends such
+     * frames; 3.11 and later also rewrite one in place and fix its checksum
+     * only at commit. Either way the WAL does not end on a commit: refused.
+     * SQLite reads every committed row.
      */
     @Test
-    fun anUnfinishedTransactionAfterTheCommits() {
+    fun anUnfinishedTransactionAfterTheCommitsIsRefused() {
         val db = open("unfinished")
         insert(db, 20)
-        val version = db.rawQuery("SELECT sqlite_version()", null).use { it.moveToFirst(); it.getString(0) }
-        val (major, minor) = version.split(".").map(String::toInt)
         db.beginTransaction()
         try {
             smallCache(db, 2)
             insert(db, 200, size = 3000) // spills uncommitted frames into the WAL
             val image = image("unfinished")
-            assertEquals("SQLite $version lost committed rows", 20, rows(image))
             val result = walCheck(image)
-            if (major == 3 && minor < 11) {
-                assertTrue("SQLite $version: expected Verified, was $result", result is Result.Verified)
-                result as Result.Verified
-                assertTrue("No uncommitted frames: $result", result.validFrames > result.committedFrames)
-            } else {
-                assertTrue("SQLite $version: expected the rewritten frame refused, was $result", result is Result.Unverified)
-                assertTrue(result.toString(), (result as Result.Unverified).reason.contains("current salt"))
-            }
+            assertTrue("Expected Unverified, was $result", result is Result.Unverified)
+            assertEquals("SQLite lost committed rows", 20, rows(image))
         } finally {
             db.endTransaction()
             db.close()
         }
+    }
+
+    /**
+     * A: killed in the middle of a transaction that spilled its pages into
+     * the WAL, each page once, so every frame is valid and none is a commit.
+     * SQLite applies only the three commits before it.
+     */
+    @Test
+    fun anInterruptedSpilledTransactionIsRefused() {
+        val db = thirtyPages("interrupted", commits = 3)
+        db.beginTransaction()
+        try {
+            smallCache(db, 2)
+            db.execSQL("UPDATE t SET v = replace(v, 'y', 'z') WHERE id > 3")
+            val image = image("interrupted")
+            val result = walCheck(image)
+            assertTrue("Expected Unverified, was $result", result is Result.Unverified)
+            assertTrue("No frames after the commits", frames(image) > commitFrames(image).last())
+            assertEquals(30, rows(image))
+            assertEquals("SQLite applied uncommitted changes", 3, changed(image))
+        } finally {
+            db.endTransaction()
+            db.close()
+        }
+    }
+
+    /** B: the same transaction rolled back, with nothing written after it: its frames stay in the WAL. */
+    @Test
+    fun aSpilledTransactionRolledBackWithNothingWrittenAfterIsRefused() {
+        val db = thirtyPages("rolledback-alone", commits = 3)
+        db.beginTransaction()
+        try {
+            smallCache(db, 2)
+            db.execSQL("UPDATE t SET v = replace(v, 'y', 'z') WHERE id > 3")
+        } finally {
+            db.endTransaction()
+        }
+        val image = image("rolledback-alone")
+        db.close()
+        val result = walCheck(image)
+        assertTrue("Expected Unverified, was $result", result is Result.Unverified)
+        assertEquals(30, rows(image))
+        assertEquals(3, changed(image))
+    }
+
+    /**
+     * C1: a commit of five pages, cut just before its commit frame, as a kill
+     * between its frame writes leaves it, or a cut that took the commit frame.
+     * SQLite applies nothing of it; refused, because nothing tells which.
+     */
+    @Test
+    fun aCommitCutBeforeItsCommitFrameIsRefused() {
+        val db = thirtyPages("cut-commit", commits = 2)
+        db.execSQL("UPDATE t SET v = replace(v, 'y', 'z') WHERE id BETWEEN 10 AND 14")
+        val full = image("cut-commit")
+        db.close()
+        assertTrue(walCheck(full) is Result.Verified)
+        assertEquals(7, changed(full))
+        val cut = full.wal { it.copyOf(offset(full, frames(full))) }
+        val result = walCheck(cut)
+        assertTrue("Expected Unverified, was $result", result is Result.Unverified)
+        assertEquals("SQLite applied part of a commit", 2, changed(cut))
+    }
+
+    /**
+     * C2, the limit no check of the file can pass: the same commit cut before
+     * its first frame reads as a shorter, sound WAL. Verified, and SQLite has
+     * lost the commit. Kept as a test so the limit stays visible.
+     */
+    @Test
+    fun aCommitCutBeforeItsFirstFrameCannotBeTold() {
+        val db = thirtyPages("cut-before", commits = 2)
+        val before = frames(image("cut-before"))
+        db.execSQL("UPDATE t SET v = replace(v, 'y', 'z') WHERE id BETWEEN 10 AND 14")
+        val full = image("cut-before")
+        db.close()
+        val cut = full.wal { it.copyOf(offset(full, before + 1)) }
+        assertTrue(walCheck(cut) is Result.Verified)
+        assertEquals(2, changed(cut))
+    }
+
+    /**
+     * D4: Android's own automatic checkpoints, every 100 frames, reset the
+     * WAL again and again while the app commits, leaving leftovers behind its
+     * last commit: verified, and nothing lost.
+     */
+    @Test
+    fun androidsOwnCheckpointsLeaveAWalThatIsVerified() {
+        val db = open("auto", androidsOwnCheckpoints = true)
+        insert(db, 350)
+        val image = image("auto")
+        db.close()
+        val result = assertVerified(image, 350, "350 commits under Android's own checkpoints")
+        assertTrue("No reset happened: $result", result.leftoverFrames > 0)
+    }
+
+    /**
+     * Commits under synchronous=FULL, which Room's own connection uses on some
+     * Android versions (API 24, 26 and 33 among those tested). A commit that
+     * syncs is where SQLite writes padding on storage without powersafe
+     * overwrite; Android's SQLite keeps it on and writes none.
+     */
+    @Test
+    fun commitsUnderFullSyncAreVerified() {
+        val db = open("fullsync")
+        db.execSQL("PRAGMA synchronous = FULL")
+        insert(db, 5)
+        val image = image("fullsync")
+        db.close()
+        assertVerified(image, 5, "synchronous=FULL")
+    }
+
+    /**
+     * Padding another SQLite wrote after each commit (the laptop's 3.53, with
+     * powersafe overwrite off and synchronous=FULL; see WalCheckTest): this
+     * device's SQLite applies the padding frames as commits, and the check
+     * accepts the WAL whole and cut anywhere within a commit's padding.
+     */
+    @Test
+    fun paddingAfterACommitIsAppliedAndVerified() {
+        val image = Image(resource("/wal/padded.db"), resource("/wal/padded.wal"))
+        assertEquals(Result.Verified(16, 16, 16, 0, 0), walCheck(image))
+        assertEquals(1, rows(image))
+        val inSecondPadding = image.wal { it.copyOf(offset(image, 13)) }
+        assertEquals(Result.Verified(12, 12, 12, 0, 0), walCheck(inSecondPadding))
+        assertEquals(1, rows(inSecondPadding))
+        val inFirstPadding = image.wal { it.copyOf(offset(image, 6)) }
+        assertEquals(Result.Verified(5, 5, 5, 0, 0), walCheck(inFirstPadding))
+        assertEquals(0, rows(inFirstPadding))
+        // Cut after the entry's first frame, before its commit frame.
+        val beforeCommit = image.wal { it.copyOf(offset(image, 10)) }
+        assertTrue(walCheck(beforeCommit) is Result.Unverified)
+        assertEquals(0, rows(beforeCommit))
     }
 
     @Test
@@ -251,14 +427,15 @@ class WalCheckRealSqliteTest {
     }
 
     /**
-     * The limit no check of the file can pass: cut exactly at a frame
-     * boundary, the WAL reads as a shorter, sound one, and SQLite reads fewer
+     * The limit no check of the file can pass: cut exactly after a commit
+     * frame, the WAL reads as a shorter, sound one, and SQLite reads fewer
      * rows. Kept as a test so the limit stays visible.
      */
     @Test
     fun aWalCutAtAFrameBoundaryCannotBeTold() {
         val image = forty()
-        val cut = image.wal { it.copyOf(offset(image, frames(image) - 4)) }
+        val lastKept = commitFrames(image).last { it <= frames(image) - 4 }
+        val cut = image.wal { it.copyOf(offset(image, lastKept + 1)) }
         assertTrue(walCheck(cut) is Result.Verified)
         assertTrue(rows(cut) < 40)
     }

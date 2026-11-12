@@ -5,38 +5,54 @@ import java.io.File
 import java.io.RandomAccessFile
 
 /**
- * Checks a database's `-wal`, reading it only, for changes SQLite would leave
- * unread without a word. It follows the WAL format SQLite documents
+ * Checks a database's `-wal`, reading it only, for frames SQLite would leave
+ * unapplied without a word. It follows the WAL format SQLite documents
  * (https://www.sqlite.org/fileformat2.html, "The Write-Ahead Log").
  *
  * SQLite reads a WAL's frames from the first and stops, with no error, at
  * the first frame that is not valid: one whose salts are not the header's,
- * whose page number is 0, or whose cumulative checksum does not match. Only
- * frames up to the last commit frame before that point count. A damaged frame
- * therefore drops every transaction after it, and `PRAGMA integrity_check`
- * on what is left still says "ok".
+ * whose page number is 0, or whose cumulative checksum does not match. Of the
+ * valid frames it applies only those up to the last commit frame. A damaged
+ * frame therefore drops every transaction after it, and `PRAGMA
+ * integrity_check` on what is left still says "ok".
  *
- * Frames past that point are normal in one case only: leftovers from before a
- * reset. After a complete checkpoint SQLite writes the WAL again from its
- * start, with salt-1 incremented and salt-2 randomised, and the older frames
- * it has not yet overwritten stay in the file, already copied into the
- * database. So every complete frame past the valid ones must be proven to be
- * such a leftover: neither salt is the current one, and its checksum chains
- * with a neighbouring frame of the same older salts, which damage to either
- * would break. A file that ends partway through a frame is accepted only when
- * that frame continues a proven leftover; SQLite's `journal_size_limit` cuts
- * the file there. Anything else, and any header SQLite would reject, is
- * [Result.Unverified].
+ * The check accepts a `-wal` only when every frame in it is either applied by
+ * SQLite or a proven leftover from before a reset:
+ *
+ * - The valid frames must end on a commit frame. Frames after the last commit
+ *   are a transaction SQLite never applies, and nothing in the file tells an
+ *   interrupted or rolled-back one from a commit whose commit frame was cut
+ *   off. The padding SQLite writes after a commit, when a commit syncs the
+ *   WAL on storage without "powersafe overwrite", repeats the commit frame,
+ *   commit size included, so it ends on a commit too. (Android's SQLite keeps
+ *   powersafe overwrite on and writes no padding.)
+ * - Every complete frame after the valid ones must be a leftover from before a
+ *   reset. After a complete checkpoint SQLite writes the WAL again from its
+ *   start, with salt-1 incremented and salt-2 randomised, and the older frames
+ *   it has not yet overwritten stay in the file, already copied into the
+ *   database. A leftover is proven when neither salt is the current one and
+ *   its checksum chains with a neighbouring frame of the same older salts,
+ *   which damage to either would break.
+ * - A file that ends partway through a frame is accepted only when that frame
+ *   continues a proven leftover; SQLite's `journal_size_limit` cuts the file
+ *   there.
+ * - The header must be one SQLite accepts, for the database's page size.
+ *
+ * Anything else is [Result.Unverified].
  *
  * What no check of the file can see: frames that are not in it at all,
- * because the file was cut exactly at a frame boundary, or because they never
- * reached storage (a power cut under `synchronous=NORMAL`). And some sound
- * files are refused: the frames of a transaction that was rolled back after
- * spilling into the WAL, or of one cut short while a frame was being written
- * or while one of its frames had been rewritten in place (SQLite 3.11 and
- * later, Android 8 on, fix such a frame's checksum only at commit), are
- * frames SQLite rightly ignores, but nothing in the file tells them apart
- * from a last commit whose header was destroyed.
+ * because the file was cut exactly after a commit frame (between two
+ * transactions, or within a commit's padding), or because they never reached
+ * storage (a power cut under `synchronous=NORMAL`).
+ *
+ * And some sound files are refused, whose frames SQLite rightly leaves
+ * unapplied but nothing in the file proves were never committed: the frames of
+ * a transaction interrupted or rolled back after they reached the WAL (all
+ * valid at its end, or overwritten in part by a later commit), of one cut
+ * short while a frame was being written or after one of its frames was
+ * rewritten in place (SQLite 3.11 and later, Android 8 on, fix such a frame's
+ * checksum only at commit), a single leftover frame, and a partial frame right
+ * after the valid ones.
  */
 internal object WalCheck {
 
@@ -45,9 +61,10 @@ internal object WalCheck {
         data object NoWal : Result
 
         /**
-         * Every frame SQLite will not read is a proven leftover from before a
-         * reset. [committedFrames] is the index of the last commit frame SQLite
-         * reads, 0 if none.
+         * SQLite applies every valid frame (the last is a commit frame), and
+         * every other complete frame is a proven leftover from before a reset.
+         * [validFrames] and [committedFrames] are therefore equal, 0 if there
+         * is no frame of the current WAL.
          */
         data class Verified(
             val frames: Int,
@@ -57,7 +74,7 @@ internal object WalCheck {
             val partialBytes: Int,
         ) : Result
 
-        /** The `-wal` holds data SQLite would not read that is not a proven leftover, or a header SQLite rejects. */
+        /** The `-wal` holds frames SQLite would not apply that are not proven leftovers, or a header SQLite rejects. */
         data class Unverified(val reason: String) : Result
     }
 
@@ -96,7 +113,7 @@ internal object WalCheck {
         val partial = ((length - HEADER) % frameSize).toInt()
         val frame = ByteArray(frameSize)
 
-        // The frames SQLite reads: each valid, chained from the header's checksum.
+        // The frames SQLite validates: each chained from the header's checksum.
         var valid = 0
         var committed = 0
         while (valid < frames) {
@@ -110,6 +127,18 @@ internal object WalCheck {
             running.copyInto(sum)
             valid++
             if (int(frame, 4) != 0) committed = valid
+        }
+
+        // They must end on a commit: frames after the last commit are a
+        // transaction SQLite never applies, interrupted, rolled back, or a
+        // commit whose commit frame was cut off, and nothing tells which.
+        // SQLite's padding after a commit repeats the commit frame, commit
+        // size included, so a padded commit ends on a commit too.
+        if (committed != valid) {
+            return Result.Unverified(
+                "The last ${valid - committed} valid frame(s) of the -wal belong to a transaction with no commit frame: " +
+                    "an interrupted or rolled-back one, or a commit whose commit frame was cut off"
+            )
         }
 
         // Every complete frame after them must be a proven leftover. A frame is

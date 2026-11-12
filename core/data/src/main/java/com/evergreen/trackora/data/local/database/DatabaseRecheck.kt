@@ -32,9 +32,10 @@ import kotlin.random.Random
  * all of these hold, and stays otherwise:
  *
  * - the database file is not empty and starts with SQLite's header;
- * - its `-wal`, if any, holds nothing SQLite would leave unread except
- *   proven leftovers from before a reset (see [WalCheck]): SQLite drops
- *   every transaction after a damaged frame without a word;
+ * - its `-wal`, if any, holds only frames SQLite applies, ending on a commit
+ *   frame, and proven leftovers from before a reset (see [WalCheck]): SQLite
+ *   silently drops every transaction after a damaged frame, and a transaction
+ *   whose commit frame is missing;
  * - `PRAGMA integrity_check` returns exactly one row, `ok`;
  * - `user_version`, Room's identity hash and the columns of `work_entries`
  *   are exactly those of a schema this app has shipped, and the database
@@ -356,7 +357,7 @@ class DatabaseRecheck internal constructor(
         val files = snapshot.entries.joinToString("\n") { (name, f) -> "  $name  ${f.size} bytes  sha256 ${f.sha256}" }
         val walLine = when (wal) {
             is WalCheck.Result.Verified ->
-                "-wal: ${wal.frames} frames; SQLite reads ${wal.validFrames}, up to the last commit at frame ${wal.committedFrames}; " +
+                "-wal: ${wal.frames} frames; SQLite applies the first ${wal.committedFrames}, ending on a commit; " +
                     "${wal.leftoverFrames} leftover frames from before a reset" + (if (wal.partialBytes > 0) ", and ${wal.partialBytes} bytes of one" else "")
             else -> "-wal: none"
         }
