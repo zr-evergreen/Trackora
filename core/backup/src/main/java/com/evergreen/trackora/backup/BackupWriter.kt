@@ -55,10 +55,19 @@ class BackupWriter internal constructor(
     private var missingPhotos = 0L
     private var lastId: Long? = null
 
-    /** Photos the entries include, by lower-cased name, so names differing only in case are caught. */
-    private val usedPhotos = HashMap<String, String>()
-    private val writtenPhotos = HashSet<String>()
+    /** A photo the entries include, and whether it has been written yet. */
+    private class PhotoUse(val name: String) {
+        var written = false
+    }
+
+    /** Photos the entries include, ignoring case, so names differing only in case are caught. */
+    private val usedPhotos = java.util.TreeMap<String, PhotoUse>(String.CASE_INSENSITIVE_ORDER)
+    private var writtenPhotos = 0
     private var lastPhoto: String? = null
+
+    init {
+        BackupRules.appProblem(app)?.let { throw BackupException(BackupProblem.INVALID_MANIFEST, "The app fields can't go in a backup: $it") }
+    }
 
     fun writeSettings(settings: BackupSettings) = step(Stage.SETTINGS) {
         BackupRules.settingsProblem(settings)?.let { fail(BackupProblem.INVALID_SETTINGS, it) }
@@ -73,8 +82,9 @@ class BackupWriter internal constructor(
         BackupRules.entryProblem(entry)?.let { fail(BackupProblem.INVALID_ENTRY, "Entry ${entry.id}: $it") }
         lastId?.let { if (entry.id <= it) fail(BackupProblem.INVALID_ENTRY, "Entry ${entry.id} comes after $it: IDs must ascend, each once") }
         entry.photo?.file?.let { name ->
-            val known = usedPhotos.put(name.lowercase(), name)
-            if (known != null && known != name) fail(BackupProblem.DUPLICATE_FILE, "Photos \"$known\" and \"$name\" differ only in capital letters")
+            val known = usedPhotos[name]
+            if (known == null) usedPhotos[name] = PhotoUse(name)
+            else if (known.name != name) fail(BackupProblem.DUPLICATE_FILE, "Photos \"${known.name}\" and \"$name\" differ only in capital letters")
         }
         val line = CanonicalJson.encode(entry).toByteArray(Charsets.UTF_8)
         if (line.size > limits.entryLineBytes) fail(BackupProblem.TOO_LARGE, "Entry ${entry.id} is larger than ${limits.entryLineBytes} bytes")
@@ -99,13 +109,13 @@ class BackupWriter internal constructor(
         if (stage == Stage.ENTRIES) step(Stage.ENTRIES) { endEntries() }
         step(Stage.PHOTOS) {
             if (!BackupRules.isPhotoName(name)) fail(BackupProblem.UNSAFE_NAME, "\"${BackupRules.printable(name)}\" isn't a name a backup allows")
-            if (usedPhotos[name.lowercase()] != name) fail(BackupProblem.INCONSISTENT, "No entry includes photo \"$name\"")
+            val use = usedPhotos[name]?.takeIf { it.name == name } ?: fail(BackupProblem.INCONSISTENT, "No entry includes photo \"$name\"")
             lastPhoto?.let {
                 if (name == it) fail(BackupProblem.DUPLICATE_FILE, "Photo \"$name\" was already written")
                 if (name < it) fail(BackupProblem.INCONSISTENT, "Photo \"$name\" comes after \"$it\": photos go in ascending name order")
             }
             // settings.json, entries.jsonl, the photos so far, this one and manifest.json.
-            if (writtenPhotos.size + 4 > limits.files) fail(BackupProblem.TOO_LARGE, "A backup holds at most ${limits.files} files")
+            if (writtenPhotos + 4 > limits.files) fail(BackupProblem.TOO_LARGE, "A backup holds at most ${limits.files} files")
 
             val measured = measure(name, open)
             count(measured.size)
@@ -124,7 +134,8 @@ class BackupWriter internal constructor(
             if (copied != measured) fail(BackupProblem.INCONSISTENT, "Photo \"$name\" changed while it was being backed up")
             zip.closeEntry()
             files += BackupFile(BackupFormat.PHOTOS_DIR + name, measured.size, measured.sha256)
-            writtenPhotos += name
+            use.written = true
+            writtenPhotos++
             lastPhoto = name
         }
     }
@@ -155,8 +166,8 @@ class BackupWriter internal constructor(
     fun finish(idHighWaterMark: Long?): BackupManifest {
         if (stage == Stage.ENTRIES) step(Stage.ENTRIES) { endEntries() }
         return step(Stage.PHOTOS) {
-            usedPhotos.values.sorted().firstOrNull { it !in writtenPhotos }?.let {
-                fail(BackupProblem.MISSING_FILE, "An entry includes photo \"$it\", but it wasn't written")
+            usedPhotos.values.firstOrNull { !it.written }?.let {
+                fail(BackupProblem.MISSING_FILE, "An entry includes photo \"${it.name}\", but it wasn't written")
             }
             if (idHighWaterMark != null) {
                 if (idHighWaterMark < 0) fail(BackupProblem.INCONSISTENT, "The ID counter $idHighWaterMark is negative, which SQLite never makes it")
@@ -169,17 +180,19 @@ class BackupWriter internal constructor(
                 app = app,
                 databaseVersion = databaseVersion,
                 entryCount = entryCount,
-                photoCount = writtenPhotos.size,
+                photoCount = writtenPhotos,
                 missingPhotoCount = missingPhotos,
                 idHighWaterMark = idHighWaterMark,
                 files = files.toList(),
             )
             BackupRules.manifestProblem(manifest, limits)?.let { fail(BackupProblem.INVALID_MANIFEST, it) }
-            val bytes = CanonicalJson.encode(manifest).toByteArray(Charsets.UTF_8)
-            if (bytes.size > limits.manifestBytes) fail(BackupProblem.TOO_LARGE, "The manifest is larger than ${limits.manifestBytes} bytes")
-            count(bytes.size.toLong())
+            // Measured first, so a manifest over the limit is refused before any of it is written.
+            var size = 0L
+            CanonicalJson.encode(manifest) { size += it.toByteArray(Charsets.UTF_8).size }
+            if (size > limits.manifestBytes) fail(BackupProblem.TOO_LARGE, "The manifest is larger than ${limits.manifestBytes} bytes")
+            count(size)
             zip.putNextEntry(zipEntry(BackupFormat.MANIFEST))
-            zip.write(bytes)
+            CanonicalJson.encode(manifest) { zip.write(it.toByteArray(Charsets.UTF_8)) }
             zip.closeEntry()
             zip.finish()
             zip.flush()

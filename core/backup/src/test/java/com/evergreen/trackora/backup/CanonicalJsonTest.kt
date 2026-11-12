@@ -109,9 +109,28 @@ class CanonicalJsonTest {
     }
 
     @Test
-    fun nestingIsCountedOutsideStringsOnly() {
-        assertFalse(CanonicalJson.nestsDeeperThan("""{"a":[{"b":1}]}""", 3))
-        assertTrue(CanonicalJson.nestsDeeperThan("""{"a":[{"b":[1]}]}""", 3))
-        assertFalse(CanonicalJson.nestsDeeperThan("""{"a":"[[[[{{{{\"[[["}""", 1))
+    fun theManifestParserReadsBackExactlyWhatTheEncoderWrites() {
+        val base = Craft().manifest()
+        val manifests = listOf(
+            base,
+            base.copy(idHighWaterMark = null, entryCount = 0, missingPhotoCount = 0),
+            base.copy(app = BackupApp("com.evergreen.trackora.debug", "\u0000\b\t\n\u000C\r\u001F\"\\/\u007F é 😀", Long.MIN_VALUE)),
+            base.copy(app = BackupApp("i".repeat(256), "v".repeat(256), Long.MAX_VALUE), databaseVersion = Int.MAX_VALUE),
+            base.copy(createdAt = "2026-11-12T12:00:00.123456789Z", entryCount = Long.MAX_VALUE, missingPhotoCount = Long.MAX_VALUE),
+        )
+        for (manifest in manifests) {
+            val text = CanonicalJson.encode(manifest)
+            assertEquals(manifest, CanonicalJson.decodeManifest(text))
+            assertEquals(text, buildString { CanonicalJson.encode(manifest) { append(it) } })
+        }
+    }
+
+    @Test
+    fun theManifestIsWrittenInPiecesOfAtMostOneRecord() {
+        val manifest = Craft().manifest()
+        val pieces = ArrayList<String>()
+        CanonicalJson.encode(manifest) { pieces += it }
+        assertEquals(manifest.files.size + 2, pieces.size)
+        assertTrue(pieces.drop(1).dropLast(1).all { it.length < 400 })
     }
 }

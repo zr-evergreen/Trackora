@@ -47,7 +47,10 @@ class BackupReaderTest {
             """[1,2,3]""",
             """not json""",
             "",
-            """{"format":"trackora-backup","formatVersion":1,"x":[[[[1]]]]}""",
+            // Every version starts with exactly these bytes: reordered or escaped, they aren't ours.
+            """{"formatVersion":1,"format":"trackora-backup"}""",
+            """{"format":"trackora\u002dbackup","formatVersion":1}""",
+            """{ "format":"trackora-backup","formatVersion":1}""",
         ).forEach { assertRefused(NOT_A_TRACKORA_BACKUP, Craft().put(BackupFormat.MANIFEST, it).build()) }
         assertRefused(NOT_A_TRACKORA_BACKUP, Craft().put(BackupFormat.MANIFEST, byteArrayOf(0xFF.toByte(), 0xFE.toByte())).build())
         // A byte-order mark: JSON parsers don't read past it, so it can't be anyone's manifest.
@@ -69,15 +72,65 @@ class BackupReaderTest {
         listOf(
             text.replace(",\"createdAt\"", ", \"createdAt\""),
             "$text\n",
-            text.replace("\"formatVersion\":1,\"createdAt\"", "\"createdAt\"").replace("\"format\":", "\"formatVersion\":1,\"format\":"),
             text.replace("\"databaseVersion\":2", "\"databaseVersion\":2,\"databaseVersion\":2"),
             text.replace("\"databaseVersion\":2", "\"databaseVersion\":2.0"),
             text.replace("\"databaseVersion\":2", "\"databaseVersion\":02"),
             text.replace("\"databaseVersion\":2", "\"databaseVersion\":\"2\""),
-            text.replace("\"trackora-backup\"", "\"trackora\\u002dbackup\""),
             text.replace("\"idHighWaterMark\":", "\"extra\":1,\"idHighWaterMark\":"),
             text.replace(",\"idHighWaterMark\":9223372036854775807", ""),
+            text.replace("\"0.0.0-fixture\"", "\"0.0.0\\u002dfixture\""),
+            text.replace("\"0.0.0-fixture\"", "\"0.0.0\\/fixture\""),
+            text.replace("\"0.0.0-fixture\"", "\"0.0.0\u0001fixture\""),
+            text.replace("\"0.0.0-fixture\"", "\"0.0.0\\u001Ffixture\""),
+            text.replace("\"0.0.0-fixture\"", "\"0.0.0\\u000afixture\""),
+            text.replace("\"idHighWaterMark\":9223372036854775807", "\"idHighWaterMark\":-0"),
+            text.replace("\"idHighWaterMark\":9223372036854775807", "\"idHighWaterMark\":9223372036854775808"),
+            text.replace("\"idHighWaterMark\":9223372036854775807", "\"idHighWaterMark\":NULL"),
+            """{"format":"trackora-backup","formatVersion":1,"x":[[[[1]]]]}""",
+            """{"format":"trackora-backup","formatVersion":01,""" + text.substringAfter("\"formatVersion\":1,"),
+            text.dropLast(1),
         ).forEach { assertRefused(INVALID_MANIFEST, Craft().put(BackupFormat.MANIFEST, it).build()) }
+    }
+
+    @Test
+    fun manifestStringsAreCappedAsTheyAreRead() {
+        val text = Craft().textOf(BackupFormat.MANIFEST)
+        val longest = "v".repeat(BackupFormat.MAX_APP_TEXT_LENGTH)
+        assertRefused(MISSING_FILE, Craft().put(BackupFormat.MANIFEST, text.replace("\"0.0.0-fixture\"", "\"$longest\"")).remove(BackupFormat.SETTINGS).build())
+        listOf(
+            text.replace("\"0.0.0-fixture\"", "\"${longest}v\""),
+            text.replace("\"com.evergreen.trackora\"", "\"${"i".repeat(BackupFormat.MAX_APP_TEXT_LENGTH + 1)}\""),
+            text.replace("\"2026-11-12T12:00:00Z\"", "\"${"9".repeat(65)}\""),
+            text.replace("\"settings.json\"", "\"${"s".repeat(136)}\""),
+        ).forEach { variant ->
+            val detail = assertRefused(INVALID_MANIFEST, Craft().put(BackupFormat.MANIFEST, variant).build())
+            assertTrue(detail, "longer than" in detail)
+        }
+    }
+
+    @Test
+    fun aManifestListingMoreFilesThanABackupHoldsStopsBeingRead() {
+        // Five files in the archive, within a limit of six; the manifest lists ten.
+        val crafted = Craft().manifest { m ->
+            m.copy(files = m.files + (1..6).map { BackupFile("photos/IMG_x$it.jpg", 1, "0".repeat(64)) })
+        }.build()
+        val detail = assertRefused(INVALID_MANIFEST, crafted, Limits.V1.copy(files = 6))
+        assertTrue(detail, "files lists more than 5 files" in detail)
+    }
+
+    /** M1: a small file declaring a manifest too large to hold, or one stuffed with a long string. */
+    @Test
+    fun m1AHugeManifestIsRefusedWithoutBeingHeld() {
+        val prefix = Craft().textOf(BackupFormat.MANIFEST).substringBefore("\"0.0.0-fixture\"") + "\""
+        val stuffed = prefix + "x".repeat(BackupFormat.MAX_MANIFEST_BYTES - prefix.length - 2) + "\"}"
+        assertEquals(BackupFormat.MAX_MANIFEST_BYTES, stuffed.length)
+        val compressed = Craft().put(BackupFormat.MANIFEST, stuffed).build()
+        assertTrue("the crafted file is small: ${compressed.size}", compressed.size < 100_000)
+        val detail = assertRefused(INVALID_MANIFEST, compressed)
+        assertTrue(detail, "app.versionName is longer than 256 characters" in detail)
+
+        val oversized = Craft().put(BackupFormat.MANIFEST, stuffed + " ").build()
+        assertRefused(TOO_LARGE, oversized)
     }
 
     @Test

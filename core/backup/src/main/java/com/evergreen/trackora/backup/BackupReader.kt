@@ -6,6 +6,7 @@ import java.io.FileOutputStream
 import java.io.InputStream
 import java.io.RandomAccessFile
 import java.security.MessageDigest
+import java.util.BitSet
 
 /** The outcome of checking a backup file. */
 sealed interface BackupCheck {
@@ -91,8 +92,9 @@ object BackupReader {
         return try {
             RandomAccessFile(file, "r").use { raf ->
                 val archive = Archive.open(raf, limits)
-                val record = archive.photoRecord(name)
-                    ?: return PhotoExtraction.Refused(BackupProblem.MISSING_FILE, "The backup has no photo \"$name\"")
+                val index = archive.photoIndex(name)
+                if (index < 0) return PhotoExtraction.Refused(BackupProblem.MISSING_FILE, "The backup has no photo \"$name\"")
+                val record = archive.photoRecords[index]
                 val dir = targetDir.canonicalFile
                 val target = File(dir, name)
                 if (target.canonicalFile.parentFile != dir) {
@@ -103,7 +105,7 @@ object BackupReader {
                 try {
                     val digest = sha256()
                     FileOutputStream(target).use { out ->
-                        archive.open(record.path).use { input ->
+                        archive.openPhoto(index).use { input ->
                             copy(input) { b, n ->
                                 digest.update(b, 0, n)
                                 out.write(b, 0, n)
@@ -132,28 +134,50 @@ internal class EntryTally(
     val count: Long,
     val missingPhotos: Long,
     val highestId: Long?,
-    val usedPhotos: Set<String>,
+    /** The photos entries use, by index among the photo records. */
+    val usedPhotos: BitSet,
 )
 
-/** A backup whose container and manifest have passed, and the files they describe. */
+/**
+ * A backup whose container and manifest have passed, and the files they
+ * describe.
+ *
+ * File i of the archive is record i of the manifest (the order is checked),
+ * so files are found by position, and photos, which are in ascending name
+ * order, by binary search: no maps or sets of names are kept, and each name
+ * is held once, shared by the archive item and the manifest record.
+ */
 internal class Archive private constructor(
     private val raf: RandomAccessFile,
     private val limits: Limits,
     val manifest: BackupManifest,
-    private val items: Map<String, ZipItem>,
+    private val items: List<ZipItem>,
 ) {
-    private val records = manifest.files.associateBy { it.path }
+    /** The manifest's records of the photos, which follow settings.json and entries.jsonl. */
+    val photoRecords: List<BackupFile> = manifest.files.subList(2, manifest.files.size)
 
-    val photoRecords: List<BackupFile> = manifest.files.drop(2)
-    private val photoNames: Set<String> = photoRecords.mapTo(HashSet()) { BackupRules.photoNameOf(it.path)!! }
+    /** The index of photo [name] among [photoRecords], or -1. */
+    fun photoIndex(name: String): Int {
+        var low = 0
+        var high = photoRecords.size - 1
+        while (low <= high) {
+            val middle = (low + high) ushr 1
+            val order = comparePhotoName(photoRecords[middle].path, name)
+            when {
+                order < 0 -> low = middle + 1
+                order > 0 -> high = middle - 1
+                else -> return middle
+            }
+        }
+        return -1
+    }
 
-    fun photoRecord(name: String): BackupFile? = records[BackupFormat.PHOTOS_DIR + name]
+    fun openPhoto(index: Int): InputStream = open(index + 2)
 
-    fun open(path: String): InputStream = ZipLayout.open(raf, items.getValue(path))
+    private fun open(index: Int): InputStream = ZipLayout.open(raf, items[index])
 
     fun readSettings(): BackupSettings {
-        val record = records.getValue(BackupFormat.SETTINGS)
-        val bytes = readWhole(record)
+        val bytes = readWhole(0)
         val text = CanonicalJson.utf8(bytes) ?: fail(BackupProblem.INVALID_SETTINGS, "settings.json isn't UTF-8 text")
         val settings = try {
             CanonicalJson.decodeSettings(text)
@@ -171,7 +195,7 @@ internal class Archive private constructor(
      * bad line it probably caused.
      */
     fun readEntries(onEntry: ((BackupEntry) -> Unit)?): EntryTally {
-        val record = records.getValue(BackupFormat.ENTRIES)
+        val record = manifest.files[1]
         val digest = sha256()
         val line = ByteArrayOutputStream()
         var lineNumber = 0L
@@ -179,7 +203,7 @@ internal class Archive private constructor(
         var count = 0L
         var missing = 0L
         var lastId: Long? = null
-        val used = HashSet<String>()
+        val used = BitSet(photoRecords.size)
 
         fun take(bytes: ByteArray) {
             lineNumber++
@@ -193,10 +217,11 @@ internal class Archive private constructor(
             BackupRules.entryProblem(entry)?.let { throw entryProblem(lineNumber, it) }
             lastId?.let { if (entry.id <= it) throw entryProblem(lineNumber, "ID ${entry.id} comes after $it: IDs must ascend, each once") }
             entry.photo?.file?.let { name ->
-                if (name !in photoNames) {
+                val index = photoIndex(name)
+                if (index < 0) {
                     throw BackupException(BackupProblem.MISSING_FILE, "Entry ${entry.id} uses photo \"$name\", which isn't in the backup")
                 }
-                used += name
+                used.set(index)
             }
             if (entry.photo?.missing != null) missing++
             count++
@@ -204,7 +229,7 @@ internal class Archive private constructor(
             onEntry?.invoke(entry)
         }
 
-        open(BackupFormat.ENTRIES).use { input ->
+        open(1).use { input ->
             copy(input) { b, n ->
                 digest.update(b, 0, n)
                 if (problem != null) return@copy
@@ -241,8 +266,9 @@ internal class Archive private constructor(
 
     /** Checks that agree with the manifest only once every entry has been read. */
     fun checkAgainst(entries: EntryTally) {
-        photoNames.sorted().firstOrNull { it !in entries.usedPhotos }?.let {
-            fail(BackupProblem.INCONSISTENT, "photos/$it isn't used by any entry")
+        val unused = entries.usedPhotos.nextClearBit(0)
+        if (unused < photoRecords.size) {
+            fail(BackupProblem.INCONSISTENT, "${photoRecords[unused].path} isn't used by any entry")
         }
         if (entries.count != manifest.entryCount) {
             fail(BackupProblem.INCONSISTENT, "The manifest says ${manifest.entryCount} entries; entries.jsonl has ${entries.count}")
@@ -258,18 +284,20 @@ internal class Archive private constructor(
     }
 
     fun checkPhotos() {
-        for (record in photoRecords) {
+        for ((index, record) in photoRecords.withIndex()) {
             val digest = sha256()
-            open(record.path).use { input -> copy(input) { b, n -> digest.update(b, 0, n) } }
+            openPhoto(index).use { input -> copy(input) { b, n -> digest.update(b, 0, n) } }
             if (hex(digest) != record.sha256) {
                 fail(BackupProblem.HASH_MISMATCH, "${record.path} doesn't match its SHA-256 in the manifest")
             }
         }
     }
 
-    private fun readWhole(record: BackupFile): ByteArray {
-        val out = ByteArrayOutputStream(record.size.toInt())
-        open(record.path).use { input -> copy(input) { b, n -> out.write(b, 0, n) } }
+    /** File [index], which [open] has already bounded to a small limit. */
+    private fun readWhole(index: Int): ByteArray {
+        val record = manifest.files[index]
+        val out = ByteArrayOutputStream()
+        open(index).use { input -> copy(input) { b, n -> out.write(b, 0, n) } }
         val bytes = out.toByteArray()
         if (hex(sha256().apply { update(bytes) }) != record.sha256) {
             fail(BackupProblem.HASH_MISMATCH, "${record.path} doesn't match its SHA-256 in the manifest")
@@ -279,7 +307,6 @@ internal class Archive private constructor(
 
     companion object {
         private const val NEWLINE = '\n'.code.toByte()
-        private const val MANIFEST_DEPTH = 3
 
         /**
          * Checks the container, finds and checks the manifest, and checks that
@@ -297,72 +324,61 @@ internal class Archive private constructor(
             if (manifests.size > 1) fail(BackupProblem.DUPLICATE_FILE, "manifest.json appears more than once")
             val manifestItem = manifests.single()
             if (manifestItem.size > limits.manifestBytes) fail(BackupProblem.TOO_LARGE, "manifest.json is larger than ${limits.manifestBytes} bytes")
-            val manifest = readManifest(raf, manifestItem, limits)
+
+            val byName = HashMap<String, ZipItem>(items.size * 2)
+            for (item in items) byName.putIfAbsent(item.name, item)
+            val manifest = readManifest(raf, manifestItem, limits) { path -> byName[path]?.name ?: path }
 
             checkNames(items)
 
-            val listed = manifest.files.map { it.path }
-            val listedSet = listed.toHashSet()
-            val contained = items.map { it.name }.filter { it != BackupFormat.MANIFEST }
-            val containedSet = contained.toHashSet()
-            listed.firstOrNull { it !in containedSet }?.let { fail(BackupProblem.MISSING_FILE, "$it is listed in the manifest but isn't in the backup") }
-            contained.firstOrNull { it !in listedSet }?.let { fail(BackupProblem.UNEXPECTED_FILE, "${BackupRules.printable(it)} isn't listed in the manifest") }
-            if (items.last().name != BackupFormat.MANIFEST || contained != listed) {
+            val listed = manifest.files
+            val inOrder = items.size == listed.size + 1 && items.last().name == BackupFormat.MANIFEST &&
+                listed.indices.all { listed[it].path == items[it].name }
+            if (!inOrder) {
+                listed.firstOrNull { byName[it.path] == null }?.let {
+                    fail(BackupProblem.MISSING_FILE, "${it.path} is listed in the manifest but isn't in the backup")
+                }
+                val listedPaths = listed.mapTo(HashSet(listed.size * 2)) { it.path }
+                items.firstOrNull { it.name != BackupFormat.MANIFEST && it.name !in listedPaths }?.let {
+                    fail(BackupProblem.UNEXPECTED_FILE, "${BackupRules.printable(it.name)} isn't listed in the manifest")
+                }
                 fail(BackupProblem.INCONSISTENT, "The files aren't in the order the format and the manifest give")
             }
 
-            val byName = items.associateBy { it.name }
-            for (record in manifest.files) {
-                val size = byName.getValue(record.path).size
+            for ((index, record) in listed.withIndex()) {
+                val size = items[index].size
                 when {
-                    record.path == BackupFormat.SETTINGS && size > limits.settingsBytes ->
+                    index == 0 && size > limits.settingsBytes ->
                         fail(BackupProblem.TOO_LARGE, "settings.json is larger than ${limits.settingsBytes} bytes")
-                    record.path.startsWith(BackupFormat.PHOTOS_DIR) && size > limits.photoBytes ->
+                    index >= 2 && size > limits.photoBytes ->
                         fail(BackupProblem.TOO_LARGE, "${record.path} is larger than ${limits.photoBytes} bytes")
                 }
             }
-            for (record in manifest.files) {
-                val size = byName.getValue(record.path).size
+            for ((index, record) in listed.withIndex()) {
+                val size = items[index].size
                 if (size != record.size) fail(BackupProblem.HASH_MISMATCH, "${record.path} is $size bytes; the manifest says ${record.size}")
             }
-            return Archive(raf, limits, manifest, byName)
+            return Archive(raf, limits, manifest, items)
         }
 
-        private fun readManifest(raf: RandomAccessFile, item: ZipItem, limits: Limits): BackupManifest {
-            val out = ByteArrayOutputStream(item.size.toInt())
-            ZipLayout.open(raf, item).use { input -> copy(input) { b, n -> out.write(b, 0, n) } }
-            val text = CanonicalJson.utf8(out.toByteArray())
-                ?: fail(BackupProblem.NOT_A_TRACKORA_BACKUP, "manifest.json isn't UTF-8 text")
-            // A manifest nests three deep. Refusing deeper text up front keeps the
-            // version check, which skips unknown values, from spending memory on it.
-            if (CanonicalJson.nestsDeeperThan(text, MANIFEST_DEPTH)) {
-                fail(BackupProblem.NOT_A_TRACKORA_BACKUP, "manifest.json isn't a Trackora backup manifest")
+        /**
+         * Parses the manifest as it unpacks. If the parse fails, the rest is
+         * still read, so a damaged manifest is reported as damaged rather than
+         * as the parse error the damage caused.
+         */
+        private fun readManifest(raf: RandomAccessFile, item: ZipItem, limits: Limits, intern: (String) -> String): BackupManifest =
+            ZipLayout.open(raf, item).use { input ->
+                val parsed = try {
+                    Result.success(ManifestParser.parse(input, limits, intern))
+                } catch (e: BackupException) {
+                    if (e.problem == BackupProblem.DAMAGED) throw e
+                    Result.failure(e)
+                }
+                copy(input) { _, _ -> }
+                val manifest = parsed.getOrThrow()
+                BackupRules.manifestProblem(manifest, limits)?.let { fail(BackupProblem.INVALID_MANIFEST, "manifest.json: $it") }
+                manifest
             }
-
-            val version = try {
-                CanonicalJson.decodeVersion(text)
-            } catch (e: IllegalArgumentException) {
-                fail(BackupProblem.NOT_A_TRACKORA_BACKUP, "manifest.json isn't a Trackora backup manifest")
-            }
-            val formatVersion = version.formatVersion
-            if (version.format != BackupFormat.FORMAT_ID || formatVersion == null) {
-                fail(BackupProblem.NOT_A_TRACKORA_BACKUP, "manifest.json isn't a Trackora backup manifest")
-            }
-            if (formatVersion > BackupFormat.VERSION) {
-                fail(BackupProblem.NEWER_FORMAT, "The backup is in format $formatVersion, from a newer version of Trackora; this one reads format ${BackupFormat.VERSION}")
-            }
-
-            val manifest = try {
-                CanonicalJson.decodeManifest(text)
-            } catch (e: IllegalArgumentException) {
-                fail(BackupProblem.INVALID_MANIFEST, "manifest.json: ${e.message?.lineSequence()?.firstOrNull()}")
-            }
-            if (CanonicalJson.encode(manifest) != text) fail(BackupProblem.INVALID_MANIFEST, "manifest.json isn't written the way the format requires")
-            BackupRules.manifestProblem(manifest, limits)?.let {
-                fail(BackupProblem.INVALID_MANIFEST, "manifest.json: $it")
-            }
-            return manifest
-        }
 
         /** Unsafe names first, then duplicates, then names the format doesn't have. */
         private fun checkNames(items: List<ZipItem>) {
@@ -373,13 +389,28 @@ internal class Archive private constructor(
             items.firstOrNull { !allowed(it.name) && BackupRules.isUnsafePath(it.name) }?.let {
                 fail(BackupProblem.UNSAFE_NAME, "A file is named \"${BackupRules.printable(it.name)}\", which could reach outside its folder")
             }
-            val seen = HashSet<String>()
-            items.firstOrNull { !seen.add(it.name.lowercase()) }?.let {
-                fail(BackupProblem.DUPLICATE_FILE, "\"${BackupRules.printable(it.name)}\" appears more than once, ignoring capital letters")
+            // Sorting ignoring case puts names that differ only in case side by side.
+            val names = items.mapTo(ArrayList(items.size)) { it.name }
+            names.sortWith(String.CASE_INSENSITIVE_ORDER)
+            for (i in 1 until names.size) {
+                if (names[i].equals(names[i - 1], ignoreCase = true)) {
+                    fail(BackupProblem.DUPLICATE_FILE, "\"${BackupRules.printable(names[i])}\" appears more than once, ignoring capital letters")
+                }
             }
             items.firstOrNull { !allowed(it.name) }?.let {
                 fail(BackupProblem.UNEXPECTED_FILE, "\"${BackupRules.printable(it.name)}\" isn't part of a Trackora backup")
             }
+        }
+
+        /** [path] (`photos/` and a name) against photo [name], in String.compareTo order. */
+        private fun comparePhotoName(path: String, name: String): Int {
+            val offset = BackupFormat.PHOTOS_DIR.length
+            val common = minOf(path.length - offset, name.length)
+            for (i in 0 until common) {
+                val difference = path[offset + i] - name[i]
+                if (difference != 0) return difference
+            }
+            return (path.length - offset) - name.length
         }
     }
 }

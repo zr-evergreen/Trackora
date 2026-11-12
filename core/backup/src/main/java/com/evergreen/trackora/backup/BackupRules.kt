@@ -96,9 +96,7 @@ internal object BackupRules {
         if (manifest.format != BackupFormat.FORMAT_ID) return "format isn't \"${BackupFormat.FORMAT_ID}\""
         if (manifest.formatVersion != BackupFormat.VERSION) return "formatVersion isn't ${BackupFormat.VERSION}"
         if (!isCanonicalInstant(manifest.createdAt)) return "createdAt isn't a time written as Instant.toString() writes it"
-        if (!CanonicalJson.isExactText(manifest.app.id) || !CanonicalJson.isExactText(manifest.app.versionName)) {
-            return "the app fields hold an unpaired surrogate"
-        }
+        appProblem(manifest.app)?.let { return it }
         if (manifest.databaseVersion < 1) return "databaseVersion is below 1"
         if (manifest.entryCount < 0 || manifest.photoCount < 0 || manifest.missingPhotoCount < 0) return "a count is negative"
         if (manifest.missingPhotoCount > manifest.entryCount) return "more missing photos than entries"
@@ -122,6 +120,17 @@ internal object BackupRules {
         for (record in files) {
             if (record.size < 0) return "${record.path} has a negative size"
             if (!SHA256.matches(record.sha256)) return "${record.path} has no valid SHA-256"
+        }
+        return null
+    }
+
+    /** The app fields: exact text, at most [BackupFormat.MAX_APP_TEXT_LENGTH] characters each. */
+    fun appProblem(app: BackupApp): String? {
+        if (!CanonicalJson.isExactText(app.id) || !CanonicalJson.isExactText(app.versionName)) {
+            return "the app fields hold an unpaired surrogate"
+        }
+        if (app.id.length > BackupFormat.MAX_APP_TEXT_LENGTH || app.versionName.length > BackupFormat.MAX_APP_TEXT_LENGTH) {
+            return "the app fields are longer than ${BackupFormat.MAX_APP_TEXT_LENGTH} characters"
         }
         return null
     }

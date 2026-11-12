@@ -28,6 +28,15 @@ class RawZip {
         var descriptorCrc: Long? = null
         var comment = ByteArray(0)
         var gapAfter = 0
+        var madeBy: Int? = null
+        var internalAttributes = 0
+        var externalAttributes = 0L
+        var localVersion: Int? = null
+        var localExtra: ByteArray? = null
+        /** Whether a deflated file has a data descriptor (as ZipOutputStream writes it) or its sizes up front. */
+        var descriptor = true
+        /** With a descriptor: also put the real CRC-32 and sizes in the local header, which ZipOutputStream never does. */
+        var localSizes = false
     }
 
     val items = ArrayList<Item>()
@@ -45,29 +54,30 @@ class RawZip {
         class Laid(val item: Item, val offset: Long, val flags: Int, val needed: Int, val crc: Long, val compressedSize: Long, val size: Long)
         val laid = items.map { item ->
             val compressed = item.compressed ?: if (item.method == 8) deflate(item.data) else item.data
-            val descriptor = item.method == 8
+            val descriptor = item.method == 8 && item.descriptor
             val flags = (item.flags ?: if (descriptor) 0x0808 else 0x0800) or (if (encryptFlag) 1 else 0)
             val needed = item.versionNeeded ?: if (item.method == 8) 20 else 10
             val crc = item.crc ?: crc32(item.data)
             val size = item.size ?: item.data.size.toLong()
             val offset = out.size().toLong()
-            out.u32(0x04034b50); out.u16(needed); out.u16(item.localFlags ?: flags); out.u16(item.method)
+            out.u32(0x04034b50); out.u16(item.localVersion ?: needed); out.u16(item.localFlags ?: flags); out.u16(item.method)
             out.u16(0); out.u16(DOS_DATE_2000)
-            if (descriptor) { out.u32(0); out.u32(0); out.u32(0) } else { out.u32(crc); out.u32(compressed.size.toLong()); out.u32(size) }
+            if (descriptor && !item.localSizes) { out.u32(0); out.u32(0); out.u32(0) } else { out.u32(crc); out.u32(compressed.size.toLong()); out.u32(size) }
             val localName = item.localName ?: item.nameBytes
-            out.u16(localName.size); out.u16(item.extra.size)
-            out.write(localName); out.write(item.extra); out.write(compressed)
+            val localExtra = item.localExtra ?: item.extra
+            out.u16(localName.size); out.u16(localExtra.size)
+            out.write(localName); out.write(localExtra); out.write(compressed)
             if (descriptor) { out.u32(0x08074b50); out.u32(item.descriptorCrc ?: crc); out.u32(compressed.size.toLong()); out.u32(size) }
             out.write(ByteArray(item.gapAfter))
             Laid(item, offset, flags, needed, crc, compressed.size.toLong(), size)
         }
         val centralStart = out.size().toLong()
         for (l in laid) {
-            out.u32(0x02014b50); out.u16(l.needed); out.u16(l.needed); out.u16(l.flags); out.u16(l.item.method)
+            out.u32(0x02014b50); out.u16(l.item.madeBy ?: l.needed); out.u16(l.needed); out.u16(l.flags); out.u16(l.item.method)
             out.u16(0); out.u16(DOS_DATE_2000)
             out.u32(l.crc); out.u32(l.compressedSize); out.u32(l.size)
             out.u16(l.item.nameBytes.size); out.u16(l.item.extra.size); out.u16(l.item.comment.size)
-            out.u16(0); out.u16(0); out.u32(0)
+            out.u16(0); out.u16(l.item.internalAttributes); out.u32(l.item.externalAttributes)
             out.u32(l.item.localOffset ?: l.offset)
             out.write(l.item.nameBytes); out.write(l.item.extra); out.write(l.item.comment)
         }

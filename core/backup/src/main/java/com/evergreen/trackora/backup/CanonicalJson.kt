@@ -1,6 +1,5 @@
 package com.evergreen.trackora.backup
 
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.nio.ByteBuffer
 import java.nio.charset.CharacterCodingException
@@ -11,48 +10,58 @@ import java.nio.charset.CodingErrorAction
  *
  * Encoding is done here by hand rather than by kotlinx-serialization, because
  * the bytes are part of the format: a library upgrade that changed how it
- * escapes a character would otherwise change format 1. Decoding uses
+ * escapes a character would otherwise change format 1.
+ *
+ * Entries and settings (at most 4 MiB each) are decoded with
  * kotlinx-serialization's strict parser, and a reader then encodes what it
  * decoded and requires the identical text. That one comparison refuses
  * duplicated or reordered keys, whitespace, alternative escapes and number
- * spellings, and anything a lenient parser might have let through.
+ * spellings, and anything a lenient parser might have let through. The
+ * manifest, which can be far larger, is read by [ManifestParser] instead,
+ * which accepts the same single spelling without holding the text.
  */
 internal object CanonicalJson {
 
     private val strict = Json
 
-    /** Reads only the version keys, so a newer manifest is recognised as newer, not as invalid. */
-    private val versionOnly = Json { ignoreUnknownKeys = true }
+    /** A whole manifest's text, through [ManifestParser]: for tests and small manifests. */
+    fun decodeManifest(text: String): BackupManifest =
+        ManifestParser.parse(text.toByteArray(Charsets.UTF_8).inputStream(), Limits.V1)
 
-    @Serializable
-    class Version(val format: String? = null, val formatVersion: Long? = null)
-
-    fun decodeVersion(text: String): Version = versionOnly.decodeFromString(Version.serializer(), text)
-    fun decodeManifest(text: String): BackupManifest = strict.decodeFromString(BackupManifest.serializer(), text)
     fun decodeEntry(text: String): BackupEntry = strict.decodeFromString(BackupEntry.serializer(), text)
     fun decodeSettings(text: String): BackupSettings = strict.decodeFromString(BackupSettings.serializer(), text)
 
-    fun encode(manifest: BackupManifest): String = buildString {
-        append("{\"format\":").string(manifest.format)
-        append(",\"formatVersion\":").append(manifest.formatVersion)
-        append(",\"createdAt\":").string(manifest.createdAt)
-        append(",\"app\":{\"id\":").string(manifest.app.id)
-        append(",\"versionName\":").string(manifest.app.versionName)
-        append(",\"versionCode\":").append(manifest.app.versionCode)
-        append("},\"databaseVersion\":").append(manifest.databaseVersion)
-        append(",\"entryCount\":").append(manifest.entryCount)
-        append(",\"photoCount\":").append(manifest.photoCount)
-        append(",\"missingPhotoCount\":").append(manifest.missingPhotoCount)
-        append(",\"idHighWaterMark\":").number(manifest.idHighWaterMark)
-        append(",\"files\":[")
+    fun encode(manifest: BackupManifest): String = buildString { encode(manifest) { append(it) } }
+
+    /**
+     * The manifest's text in pieces of at most one file record each, so a
+     * writer never holds all of it.
+     */
+    fun encode(manifest: BackupManifest, piece: (String) -> Unit) {
+        piece(buildString {
+            append("{\"format\":").string(manifest.format)
+            append(",\"formatVersion\":").append(manifest.formatVersion)
+            append(",\"createdAt\":").string(manifest.createdAt)
+            append(",\"app\":{\"id\":").string(manifest.app.id)
+            append(",\"versionName\":").string(manifest.app.versionName)
+            append(",\"versionCode\":").append(manifest.app.versionCode)
+            append("},\"databaseVersion\":").append(manifest.databaseVersion)
+            append(",\"entryCount\":").append(manifest.entryCount)
+            append(",\"photoCount\":").append(manifest.photoCount)
+            append(",\"missingPhotoCount\":").append(manifest.missingPhotoCount)
+            append(",\"idHighWaterMark\":").number(manifest.idHighWaterMark)
+            append(",\"files\":[")
+        })
         manifest.files.forEachIndexed { i, file ->
-            if (i > 0) append(',')
-            append("{\"path\":").string(file.path)
-            append(",\"size\":").append(file.size)
-            append(",\"sha256\":").string(file.sha256)
-            append('}')
+            piece(buildString {
+                if (i > 0) append(',')
+                append("{\"path\":").string(file.path)
+                append(",\"size\":").append(file.size)
+                append(",\"sha256\":").string(file.sha256)
+                append('}')
+            })
         }
-        append("]}")
+        piece("]}")
     }
 
     fun encode(entry: BackupEntry): String = buildString {
@@ -111,24 +120,6 @@ internal object CanonicalJson {
     }
 
     private const val HEX = "0123456789abcdef"
-
-    /** Whether [text] nests objects and arrays more than [limit] deep, counting outside strings. */
-    fun nestsDeeperThan(text: String, limit: Int): Boolean {
-        var depth = 0
-        var inString = false
-        var escaped = false
-        for (c in text) {
-            when {
-                escaped -> escaped = false
-                inString && c == '\\' -> escaped = true
-                c == '"' -> inString = !inString
-                inString -> {}
-                c == '{' || c == '[' -> if (++depth > limit) return true
-                c == '}' || c == ']' -> depth--
-            }
-        }
-        return false
-    }
 
     /**
      * [bytes] as text, or null unless they are well-formed UTF-8. The usual

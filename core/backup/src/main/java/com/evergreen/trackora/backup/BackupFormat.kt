@@ -28,11 +28,14 @@ package com.evergreen.trackora.backup
  *
  * - `format`: `"trackora-backup"`.
  * - `formatVersion`: `1`. A reader refuses a higher version as made by a newer
- *   app, before reading anything else. Every version keeps these two keys.
+ *   app, before reading anything else. Every format version starts
+ *   `manifest.json` with exactly `{"format":"trackora-backup","formatVersion":`
+ *   and its number, so a reader can tell a newer backup from a damaged one.
  * - `createdAt`: when the backup was made, in UTC, exactly as
  *   `java.time.Instant.toString()` writes it.
  * - `app`: `{"id", "versionName", "versionCode"}` of the app that wrote it.
- *   Information only.
+ *   Information only. `id` and `versionName` are at most
+ *   [MAX_APP_TEXT_LENGTH] characters each.
  * - `databaseVersion`: the database version the entries were read from.
  *   Information only: entries in format 1 always have the fields below.
  * - `entryCount`: lines in `entries.jsonl`.
@@ -94,24 +97,36 @@ package com.evergreen.trackora.backup
  *
  * ## The ZIP container
  *
- * Only the plain subset `java.util.zip.ZipOutputStream` writes for files of
- * this size, so that no two programs can see different contents in one file:
+ * Exactly the headers `java.util.zip.ZipOutputStream` writes, on the JVM and on
+ * Android 7 to 16 alike, and nothing more:
  *
- * - Each file is DEFLATED or STORED. (The writer deflates the JSON files and
- *   stores the photos, which don't compress.) No encryption, ZIP64, comments
- *   or multiple disks.
+ * - Each file is STORED or DEFLATED. (The writer deflates the JSON files and
+ *   stores the photos, which don't compress.)
+ *   - A stored file has flags `0x0800` (UTF-8 names), and "version needed" and
+ *     "version made by" both `10`.
+ *   - A deflated file has flags `0x0808` (UTF-8 names, data descriptor), and
+ *     both versions `20`. Its local header's CRC-32 and sizes are `0`; the
+ *     data descriptor after its data, with its signature, carries them.
+ *   - The "version made by" host byte is therefore MS-DOS (`0`), and internal
+ *     and external attributes are `0`: no permissions, no symbolic links.
+ * - No extra fields (so no ZIP64, Unicode paths or timestamps), comments,
+ *   encryption or multiple disks. File times are ignored.
+ * - A name is 1 to 135 bytes: the longest a backup has is `photos/` and a
+ *   128-character photo name.
  * - Files lie back to back from the first byte. The central directory follows
  *   the last one directly, and the end record closes the file, with nothing
  *   after it.
  * - A file's local header agrees with its central-directory record: name,
- *   method, flags, and the CRC-32 and sizes unless a data descriptor follows.
- *   A data descriptor carries its signature and agrees too.
+ *   method, flags, versions, and the CRC-32 and sizes (or zeros, with a data
+ *   descriptor).
  * - The archive holds the files the manifest lists, in its order, then
  *   `manifest.json`. Nothing else.
  *
- * Anything else is refused, even where other ZIP tools would open it: an
- * archive the writer could not have made is damaged, or was made by
- * something else.
+ * Anything else is refused, even where other ZIP tools would open it. Other
+ * tools act on extra fields and attributes (a Unicode path field renames a
+ * file; Unix attributes make it a symbolic link), so accepting them would let
+ * one archive mean different things to different programs; and an archive the
+ * writer could not have made is damaged, or was made by something else.
  *
  * ## Limits
  *
@@ -132,13 +147,22 @@ object BackupFormat {
 
     /**
      * All files together, unpacked: under 4 GiB. The 64 MiB kept free below
-     * 4 GiB is room for the ZIP's own headers (under 25 MB even at
+     * 4 GiB is room for the ZIP's own headers (under 4 MB even at
      * [MAX_FILES] files), so no size or offset in the archive ever needs ZIP64.
      */
     const val MAX_TOTAL_BYTES: Long = 4096 * MIB - 64 * MIB
 
-    /** Files in the archive, `manifest.json` included. Below ZIP's 65,535. */
-    const val MAX_FILES = 65_000
+    /**
+     * Files in the archive, `manifest.json` included.
+     *
+     * Set by measurement: the reader and writer keep a small record per file,
+     * and on a 48 MiB app heap (Android 7's emulator) with half of it left to
+     * the app, writing the largest backup ran out of memory from 14,000 files
+     * and peaked at 15 MiB at 10,000. It is no practical limit: under
+     * [MAX_TOTAL_BYTES], 10,000 photos would average 400 KB, and camera photos
+     * are several times that.
+     */
+    const val MAX_FILES = 10_000
 
     const val MAX_PHOTO_BYTES: Long = 256 * MIB
 
@@ -150,10 +174,18 @@ object BackupFormat {
 
     const val MAX_SETTINGS_BYTES: Int = (4 * MIB).toInt()
 
-    /** Room for [MAX_FILES] records with the longest names, twice over. */
-    const val MAX_MANIFEST_BYTES: Int = (32 * MIB).toInt()
+    /**
+     * The bytes a reader will read of `manifest.json`: several times the
+     * largest manifest the format allows (about 2.3 MiB at [MAX_FILES] files
+     * with the longest names). Memory doesn't depend on it: the manifest is
+     * parsed as it is read, and stops at [MAX_FILES] records.
+     */
+    const val MAX_MANIFEST_BYTES: Int = (16 * MIB).toInt()
 
     const val MAX_PHOTO_NAME_LENGTH = 128
+
+    /** `app.id` and `app.versionName`, in characters. */
+    const val MAX_APP_TEXT_LENGTH = 256
 }
 
 /**

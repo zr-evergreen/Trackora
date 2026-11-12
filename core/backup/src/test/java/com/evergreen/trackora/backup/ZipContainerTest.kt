@@ -3,9 +3,11 @@ package com.evergreen.trackora.backup
 import com.evergreen.trackora.backup.BackupProblem.DAMAGED
 import com.evergreen.trackora.backup.BackupProblem.NOT_A_ZIP
 import com.evergreen.trackora.backup.BackupProblem.TOO_LARGE
+import com.evergreen.trackora.backup.BackupProblem.UNEXPECTED_FILE
 import com.evergreen.trackora.backup.BackupProblem.UNSUPPORTED_ZIP
 import com.evergreen.trackora.backup.TestBackups.assertRefused
 import com.evergreen.trackora.backup.TestBackups.assertValid
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -104,15 +106,121 @@ class ZipContainerTest {
             { items[0].versionNeeded = 45 },
             { items[0].extra = byteArrayOf(0x01, 0x00, 0x08, 0x00) + ByteArray(8) },
             { items[0].comment = "note".toByteArray() },
+            { items[0].flags = 0x0800 or 0x0001 },
             { total = 0xFFFF },
         )
         cases.forEachIndexed { i, case -> assertRefused(UNSUPPORTED_ZIP, RawZip.of(files, case)).also { assertTrue("case $i", it.isNotEmpty()) } }
     }
 
+    /**
+     * Other tools act on extra fields: a Unicode path field renames a file
+     * (libarchive lists it under the new name), so none is accepted, in either
+     * header, whatever its kind.
+     */
     @Test
-    fun harmlessExtraFieldsAreAllowedButMalformedOnesAreNot() {
-        assertValid(RawZip.of(files) { items[0].extra = byteArrayOf(0x55, 0x54, 0x05, 0x00, 1, 0, 0, 0, 0) })
-        assertRefused(DAMAGED, RawZip.of(files) { items[0].extra = byteArrayOf(0x55, 0x54, 0x09, 0x00, 1) })
+    fun everyExtraFieldIsRefused() {
+        val unicodePath = run {
+            val alias = "../../evil.jpg".toByteArray()
+            val crc = RawZip.crc32(camera.toByteArray()).let { byteArrayOf(it.toByte(), (it shr 8).toByte(), (it shr 16).toByte(), (it shr 24).toByte()) }
+            byteArrayOf(0x75, 0x70, (5 + alias.size).toByte(), 0x00, 0x01) + crc + alias
+        }
+        val extras = mapOf(
+            "Unicode path" to unicodePath,
+            "extended timestamp" to byteArrayOf(0x55, 0x54, 0x05, 0x00, 1, 0, 0, 0, 0),
+            "ZIP64" to byteArrayOf(0x01, 0x00, 0x08, 0x00) + ByteArray(8),
+            "empty, unknown" to byteArrayOf(0x34, 0x12, 0x00, 0x00),
+            "malformed" to byteArrayOf(0x55, 0x54, 0x09, 0x00, 1),
+        )
+        for ((kind, extra) in extras) {
+            val photo = files.indexOfFirst { it.first == camera }
+            val inBoth = assertRefused(UNSUPPORTED_ZIP, RawZip.of(files) { items[photo].extra = extra })
+            assertTrue("$kind: $inBoth", "extra fields" in inBoth)
+            val localOnly = assertRefused(UNSUPPORTED_ZIP, RawZip.of(files) { items[photo].localExtra = extra })
+            assertTrue("$kind: $localOnly", "extra fields" in localOnly)
+        }
+    }
+
+    @Test
+    fun aSymbolicLinkOrAnyFileAttributeIsRefused() {
+        val photo = files.indexOfFirst { it.first == camera }
+        for (attributes in listOf(0xA1FFL shl 16, 0x81A4L shl 16, 0x20L, 0x10L)) {
+            val detail = assertRefused(UNSUPPORTED_ZIP, RawZip.of(files) { items[photo].externalAttributes = attributes })
+            assertTrue(detail, "symbolic link" in detail)
+        }
+        assertRefused(UNSUPPORTED_ZIP, RawZip.of(files) { items[photo].internalAttributes = 1 })
+    }
+
+    @Test
+    fun anArchiveMadeOnAnotherSystemIsRefused() {
+        val photo = files.indexOfFirst { it.first == camera }
+        // Unix as the host, as Python's zipfile and Info-ZIP write it on Linux and macOS.
+        assertRefused(UNSUPPORTED_ZIP, RawZip.of(files) { items[photo].madeBy = 0x0300 or 10 })
+        assertRefused(UNSUPPORTED_ZIP, RawZip.of(files) { items[0].madeBy = 0x0300 or 20 })
+        // A "version made by" other than the one ZipOutputStream writes.
+        assertRefused(UNSUPPORTED_ZIP, RawZip.of(files) { items[0].madeBy = 45 })
+        assertRefused(UNSUPPORTED_ZIP, RawZip.of(files) { items[0].madeBy = 10 })
+    }
+
+    @Test
+    fun flagsZipOutputStreamNeverWritesAreRefused() {
+        val photo = files.indexOfFirst { it.first == camera }
+        val cases = listOf<RawZip.() -> Unit>(
+            { items[0].flags = 0x0808 or 0x0002 },
+            { items[0].flags = 0x0808 or 0x0004 },
+            { items[0].flags = 0x0008 },
+            { items[photo].method = 0; items[photo].flags = 0x0000 },
+            // Deflated with the sizes up front instead of a data descriptor.
+            { items[0].descriptor = false; items[0].flags = 0x0800 },
+        )
+        cases.forEachIndexed { i, case -> assertRefused(UNSUPPORTED_ZIP, RawZip.of(files, case)).also { assertTrue("case $i: $it", "flags" in it) } }
+    }
+
+    @Test
+    fun aLocalHeaderMustMatchExactlyWhatZipOutputStreamWrites() {
+        // The data descriptor carries a deflated file's CRC-32 and sizes; its local header has zeros.
+        assertRefused(DAMAGED, RawZip.of(files) { items[0].localSizes = true })
+        assertRefused(DAMAGED, RawZip.of(files) { items[0].localVersion = 10 })
+        assertRefused(DAMAGED, RawZip.of(files) { items[0].localVersion = 0x0314 })
+    }
+
+    @Test
+    fun aNameLongerThanAnyBackupUsesIsRefusedBeforeItIsRead() {
+        val longest = BackupFormat.PHOTOS_DIR + "A".repeat(BackupFormat.MAX_PHOTO_NAME_LENGTH)
+        assertEquals(135, longest.length)
+        // 135 bytes passes the container (and is then an unexpected file, as no entry uses it).
+        assertRefused(UNEXPECTED_FILE, Craft().put(longest, "x").build())
+        val detail = assertRefused(UNEXPECTED_FILE, Craft().put(longest + "A", "x").build())
+        assertTrue(detail, "136 bytes" in detail)
+        // A name so long the central directory outgrows its bound is refused by that bound, unread.
+        val huge = assertRefused(UNSUPPORTED_ZIP, Craft().put("photos/" + "A".repeat(65_000), "x").build())
+        assertTrue(huge, "larger than 6 file names can need" in huge)
+    }
+
+    @Test
+    fun aCentralDirectoryLargerThanItsNamesCanNeedIsRefusedBeforeItIsRead() {
+        // The end record claims a 64 MiB central directory for one file; the file is sparse padding.
+        val claimed = 64L * 1024 * 1024
+        val file = java.io.File.createTempFile("m2-bound", ".zip")
+        try {
+            java.io.RandomAccessFile(file, "rw").use { raf ->
+                raf.write("PK".toByteArray())
+                raf.setLength(claimed + 22)
+                raf.seek(claimed)
+                raf.write(endRecord(total = 1, centralSize = claimed, centralOffset = 0))
+            }
+            val result = BackupReader.verify(file)
+            assertTrue("$result", result is BackupCheck.Invalid && result.problem == UNSUPPORTED_ZIP)
+            assertTrue("$result", "larger than 1 file names can need" in (result as BackupCheck.Invalid).detail)
+        } finally {
+            file.delete()
+        }
+    }
+
+    private fun endRecord(total: Int, centralSize: Long, centralOffset: Long): ByteArray {
+        val b = java.nio.ByteBuffer.allocate(22).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+        b.putInt(0x06054b50).putShort(0).putShort(0).putShort(total.toShort()).putShort(total.toShort())
+        b.putInt(centralSize.toInt()).putInt(centralOffset.toInt()).putShort(0)
+        return b.array()
     }
 
     @Test

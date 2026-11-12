@@ -102,10 +102,14 @@ class BackupWriterTest {
         )
         for ((first, second) in versions) {
             var reads = 0
+            val out = ByteArrayOutputStream()
+            val w = writer(out).apply { writeSettings(FixtureData.emptySettings); writeEntry(entry(1, included("IMG_1.jpg"))) }
             assertWriterRefuses(INCONSISTENT) {
-                started().apply { writeEntry(entry(1, included("IMG_1.jpg"))) }
-                    .writePhoto("IMG_1.jpg") { (if (reads++ == 0) first else second).inputStream() }
+                w.writePhoto("IMG_1.jpg") { (if (reads++ == 0) first else second).inputStream() }
             }
+            // Closing can't complete the stored entry, so no end record is written and the file is refused.
+            try { w.close() } catch (expected: java.util.zip.ZipException) { }
+            assertRefused(BackupProblem.DAMAGED, out.toByteArray())
         }
     }
 
@@ -176,6 +180,20 @@ class BackupWriterTest {
     fun manifestValuesAreChecked() {
         assertWriterRefuses(INVALID_MANIFEST) { writer(databaseVersion = 0).apply { writeSettings(FixtureData.emptySettings) }.finish(null) }
         assertWriterRefuses(INVALID_MANIFEST) { writer(appVersion = "\uD800").apply { writeSettings(FixtureData.emptySettings) }.finish(null) }
+    }
+
+    @Test
+    fun appFieldsLongerThanTheFormatAllowsAreRefusedBeforeAnythingIsWritten() {
+        val out = ByteArrayOutputStream()
+        assertWriterRefuses(INVALID_MANIFEST) { writer(out, appVersion = "v".repeat(BackupFormat.MAX_APP_TEXT_LENGTH + 1)) }
+        assertWriterRefuses(INVALID_MANIFEST) {
+            BackupWriter(out, FixtureData.createdAt, FixtureData.app.copy(id = "i".repeat(BackupFormat.MAX_APP_TEXT_LENGTH + 1)), 2)
+        }
+        assertEquals(0, out.size())
+        assertValid(TestBackups.write { writeSettings(FixtureData.emptySettings); finish(null) })
+        val longest = ByteArrayOutputStream()
+        writer(longest, appVersion = "v".repeat(BackupFormat.MAX_APP_TEXT_LENGTH)).use { it.writeSettings(FixtureData.emptySettings); it.finish(null) }
+        assertValid(longest.toByteArray())
     }
 
     @Test

@@ -12,11 +12,16 @@ internal class ZipItem(
     /** The name's bytes as ISO-8859-1, so every byte maps to one character and nothing is lost. */
     val name: String,
     val method: Int,
+    val flags: Int,
     val crc: Long,
     val compressedSize: Long,
     val size: Long,
-    val dataOffset: Long,
-)
+    val localOffset: Long,
+) {
+    /** Where the file's data starts; set once its local header has been checked. */
+    var dataOffset: Long = -1
+        internal set
+}
 
 /**
  * Reads the structure of a backup's ZIP container and refuses anything outside
@@ -31,6 +36,17 @@ internal class ZipItem(
  * single unambiguous one the writer produces: files back to back from byte 0,
  * each local header agreeing with the central directory, the central directory
  * right after the last file, the end record at the very end.
+ *
+ * Only the header fields ZipOutputStream writes (on the JVM and on Android
+ * 7-16 alike) are accepted. Anything else, such as extra fields (Unicode
+ * paths, timestamps, ZIP64), Unix attributes (permissions, symbolic links) or
+ * other flags, is refused: other tools act on those fields, so accepting them
+ * would let one archive mean different things to different programs.
+ *
+ * Memory stays small whatever the file claims: the central directory is read
+ * through a 64 KiB buffer, after its size has been bounded by what [total]
+ * names of at most [MAX_NAME_BYTES] can need, and each name is refused before
+ * it is copied if it is longer than any a backup uses.
  *
  * Unpacking uses Android's own zlib through [Inflater].
  */
@@ -51,15 +67,25 @@ internal object ZipLayout {
 
     private const val FLAG_ENCRYPTED = 0x0001
     private const val FLAG_DESCRIPTOR = 0x0008
+    private const val FLAG_UTF8 = 0x0800
     private const val FLAG_STRONG_ENCRYPTION = 0x0040
 
-    /** Deflate options (bits 1, 2), data descriptor (3), UTF-8 names (11): what ZipOutputStream sets. */
-    private const val ALLOWED_FLAGS = 0x0002 or 0x0004 or FLAG_DESCRIPTOR or 0x0800
+    /**
+     * The only flags ZipOutputStream writes: UTF-8 names, plus a data
+     * descriptor on a deflated file (whose CRC-32 and sizes follow its data).
+     */
+    private const val STORED_FLAGS = FLAG_UTF8
+    private const val DEFLATED_FLAGS = FLAG_UTF8 or FLAG_DESCRIPTOR
 
-    /** 2.0: deflate. ZIP64 needs 4.5, and encryption schemes more. */
-    private const val MAX_VERSION_NEEDED = 20
-    private const val ZIP64_EXTRA_ID = 0x0001
-    private const val MAX_CENTRAL_DIRECTORY = 64 * 1024 * 1024
+    /** "Version needed", and equally "version made by" with the MS-DOS host byte 0, as ZipOutputStream writes them. */
+    private const val STORED_VERSION = 10
+    private const val DEFLATED_VERSION = 20
+
+    /** The longest name a backup has: `photos/` and a 128-character photo name. */
+    val MAX_NAME_BYTES = BackupFormat.PHOTOS_DIR.length + BackupFormat.MAX_PHOTO_NAME_LENGTH
+
+    /** A central-directory record with the longest name and nothing else. */
+    private val MAX_CENTRAL_RECORD = CENTRAL_SIZE + MAX_NAME_BYTES
 
     fun read(raf: RandomAccessFile, limits: Limits): List<ZipItem> {
         val length = raf.length()
@@ -89,99 +115,100 @@ internal object ZipLayout {
         if (u16(end, 20) != 0) broken("its end record claims a comment that isn't there")
         if (total > limits.files) throw BackupException(BackupProblem.TOO_LARGE, "The backup holds $total files; the limit is ${limits.files}")
         if (centralOffset + centralSize != length - END_SIZE) broken("its central directory isn't where the end record says")
-        if (centralSize > MAX_CENTRAL_DIRECTORY) throw BackupException(BackupProblem.TOO_LARGE, "The ZIP's central directory is too large")
+        // Both are below 2^32 and total is below 2^16, so these products can't overflow a Long.
+        if (centralSize > total.toLong() * MAX_CENTRAL_RECORD) {
+            unsupported("a central directory larger than $total file names can need (long names, extra fields or comments)")
+        }
 
-        val central = readAt(raf, centralOffset, centralSize.toInt(), length) ?: broken("its central directory can't be read")
-        val records = ArrayList<Record>(total)
-        var p = 0
+        val central = Region(raf, centralOffset, centralOffset + centralSize)
+        val header = ByteArray(CENTRAL_SIZE)
+        val items = ArrayList<ZipItem>(total)
         for (i in 1..total) {
-            if (p + CENTRAL_SIZE > central.size || u32(central, p) != CENTRAL_SIGNATURE) broken("central directory record $i is damaged")
-            val versionNeeded = u16(central, p + 6)
-            val flags = u16(central, p + 8)
-            val method = u16(central, p + 10)
-            val crc = u32(central, p + 16)
-            val compressedSize = u32(central, p + 20)
-            val size = u32(central, p + 24)
-            val nameLength = u16(central, p + 28)
-            val extraLength = u16(central, p + 30)
-            val commentLength = u16(central, p + 32)
-            val diskStart = u16(central, p + 34)
-            val localOffset = u32(central, p + 42)
-            val next = p + CENTRAL_SIZE + nameLength + extraLength + commentLength
-            if (next > central.size) broken("central directory record $i runs past its end")
+            if (!central.read(header, CENTRAL_SIZE) || u32(header, 0) != CENTRAL_SIGNATURE) broken("central directory record $i is damaged")
+            val versionMadeBy = u16(header, 4)
+            val versionNeeded = u16(header, 6)
+            val flags = u16(header, 8)
+            val method = u16(header, 10)
+            val crc = u32(header, 16)
+            val compressedSize = u32(header, 20)
+            val size = u32(header, 24)
+            val nameLength = u16(header, 28)
+            val extraLength = u16(header, 30)
+            val commentLength = u16(header, 32)
+            val diskStart = u16(header, 34)
+            val internalAttributes = u16(header, 36)
+            val externalAttributes = u32(header, 38)
+            val localOffset = u32(header, 42)
 
             if (flags and (FLAG_ENCRYPTED or FLAG_STRONG_ENCRYPTION) != 0) unsupported("encryption")
-            if (flags and ALLOWED_FLAGS.inv() != 0) unsupported("flags 0x${Integer.toHexString(flags)}")
             if (method != STORED && method != DEFLATED) unsupported("compression method $method")
-            if (method == STORED && flags and FLAG_DESCRIPTOR != 0) unsupported("a data descriptor on a stored file")
-            if (versionNeeded > MAX_VERSION_NEEDED) unsupported("features of ZIP version ${versionNeeded / 10}.${versionNeeded % 10}")
+            if (versionNeeded > DEFLATED_VERSION) unsupported("features of ZIP version ${versionNeeded / 10}.${versionNeeded % 10}")
             if (compressedSize == 0xFFFFFFFFL || size == 0xFFFFFFFFL || localOffset == 0xFFFFFFFFL || diskStart == 0xFFFF) unsupported("ZIP64")
             if (diskStart != 0) unsupported("several disks")
+            if (extraLength != 0) unsupported("extra fields, such as Unicode paths, timestamps or ZIP64")
             if (commentLength != 0) unsupported("file comments")
-            if (method == STORED && compressedSize != size) broken("a stored file's two sizes differ")
             if (nameLength == 0) broken("a file has no name")
-            checkExtra(central, p + CENTRAL_SIZE + nameLength, extraLength, ::broken, ::unsupported)
+            if (nameLength > MAX_NAME_BYTES) {
+                throw BackupException(BackupProblem.UNEXPECTED_FILE, "A file's name is $nameLength bytes, longer than any name in a Trackora backup")
+            }
+            if (method == STORED && flags and FLAG_DESCRIPTOR != 0) unsupported("a data descriptor on a stored file")
+            if (flags != (if (method == STORED) STORED_FLAGS else DEFLATED_FLAGS)) unsupported("flags 0x${Integer.toHexString(flags)}")
+            val version = if (method == STORED) STORED_VERSION else DEFLATED_VERSION
+            if (versionNeeded != version || versionMadeBy != version) {
+                unsupported("version fields 0x${Integer.toHexString(versionMadeBy)}/$versionNeeded, as written by other tools or systems")
+            }
+            if (internalAttributes != 0 || externalAttributes != 0L) unsupported("file attributes, such as permissions or a symbolic link")
+            if (method == STORED && compressedSize != size) broken("a stored file's two sizes differ")
 
-            records += Record(
-                nameBytes = central.copyOfRange(p + CENTRAL_SIZE, p + CENTRAL_SIZE + nameLength),
-                flags = flags,
-                method = method,
-                crc = crc,
-                compressedSize = compressedSize,
-                size = size,
-                localOffset = localOffset,
-            )
-            p = next
+            val nameBytes = ByteArray(nameLength)
+            if (!central.read(nameBytes, nameLength)) broken("central directory record $i runs past its end")
+            items += ZipItem(String(nameBytes, Charsets.ISO_8859_1), method, flags, crc, compressedSize, size, localOffset)
         }
-        if (p != central.size) broken("its central directory has bytes after the last record")
+        if (central.position != centralOffset + centralSize) broken("its central directory has bytes after the last record")
 
+        val files = Region(raf, 0, centralOffset)
+        val local = ByteArray(LOCAL_SIZE)
+        val descriptor = ByteArray(DESCRIPTOR_SIZE)
         var expected = 0L
-        val items = records.map { r ->
-            if (r.localOffset != expected) broken("its files don't lie back to back")
-            if (r.localOffset + LOCAL_SIZE > centralOffset) broken("a file runs into the central directory")
-            val header = readAt(raf, r.localOffset, LOCAL_SIZE, length) ?: broken("a file header can't be read")
-            if (u32(header, 0) != LOCAL_SIGNATURE) broken("a file header is damaged")
-            val versionNeeded = u16(header, 4)
-            val flags = u16(header, 6)
-            val method = u16(header, 8)
-            val crc = u32(header, 14)
-            val compressedSize = u32(header, 18)
-            val size = u32(header, 22)
-            val nameLength = u16(header, 26)
-            val extraLength = u16(header, 28)
-            if (versionNeeded > MAX_VERSION_NEEDED) unsupported("features of ZIP version ${versionNeeded / 10}.${versionNeeded % 10}")
-            if (flags != r.flags || method != r.method) broken("a file header disagrees with the central directory")
-            val descriptor = r.flags and FLAG_DESCRIPTOR != 0
-            fun agrees(local: Long, central: Long) = local == central || (descriptor && local == 0L)
-            if (!agrees(crc, r.crc) || !agrees(compressedSize, r.compressedSize) || !agrees(size, r.size)) {
+        for (item in items) {
+            if (item.localOffset != expected) broken("its files don't lie back to back")
+            files.position = item.localOffset
+            if (!files.read(local, LOCAL_SIZE) || u32(local, 0) != LOCAL_SIGNATURE) broken("a file header is damaged or runs into the central directory")
+            val versionNeeded = u16(local, 4)
+            val flags = u16(local, 6)
+            val method = u16(local, 8)
+            val crc = u32(local, 14)
+            val compressedSize = u32(local, 18)
+            val size = u32(local, 22)
+            val nameLength = u16(local, 26)
+            val extraLength = u16(local, 28)
+            val hasDescriptor = item.flags and FLAG_DESCRIPTOR != 0
+            if (versionNeeded != (if (item.method == STORED) STORED_VERSION else DEFLATED_VERSION) || flags != item.flags || method != item.method) {
                 broken("a file header disagrees with the central directory")
             }
-            val variableStart = r.localOffset + LOCAL_SIZE
-            if (variableStart + nameLength + extraLength > centralOffset) broken("a file runs into the central directory")
-            val variable = readAt(raf, variableStart, nameLength + extraLength, length) ?: broken("a file header can't be read")
-            if (!variable.copyOfRange(0, nameLength).contentEquals(r.nameBytes)) broken("a file's two names differ")
-            checkExtra(variable, nameLength, extraLength, ::broken, ::unsupported)
+            // With a data descriptor, ZipOutputStream leaves these zero and writes them after the data.
+            val agrees = if (hasDescriptor) crc == 0L && compressedSize == 0L && size == 0L
+            else crc == item.crc && compressedSize == item.compressedSize && size == item.size
+            if (!agrees) broken("a file header disagrees with the central directory")
+            if (extraLength != 0) unsupported("extra fields, such as Unicode paths, timestamps or ZIP64")
+            if (nameLength != item.name.length) broken("a file's two names differ")
+            val nameBytes = ByteArray(nameLength)
+            if (!files.read(nameBytes, nameLength) || !nameBytes.contentEquals(item.name.toByteArray(Charsets.ISO_8859_1))) {
+                broken("a file's two names differ")
+            }
 
-            val dataOffset = variableStart + nameLength + extraLength
-            var next = dataOffset + r.compressedSize
-            if (descriptor) {
-                if (next + DESCRIPTOR_SIZE > centralOffset) broken("a file runs into the central directory")
-                val d = readAt(raf, next, DESCRIPTOR_SIZE, length) ?: broken("a data descriptor can't be read")
-                if (u32(d, 0) != DESCRIPTOR_SIGNATURE || u32(d, 4) != r.crc || u32(d, 8) != r.compressedSize || u32(d, 12) != r.size) {
+            item.dataOffset = files.position
+            files.position = item.dataOffset + item.compressedSize
+            if (hasDescriptor) {
+                if (!files.read(descriptor, DESCRIPTOR_SIZE)) broken("a file runs into the central directory")
+                if (u32(descriptor, 0) != DESCRIPTOR_SIGNATURE || u32(descriptor, 4) != item.crc ||
+                    u32(descriptor, 8) != item.compressedSize || u32(descriptor, 12) != item.size
+                ) {
                     broken("a data descriptor disagrees with the central directory")
                 }
-                next += DESCRIPTOR_SIZE
             }
-            if (next > centralOffset) broken("a file runs into the central directory")
-            expected = next
-            ZipItem(
-                name = String(r.nameBytes, Charsets.ISO_8859_1),
-                method = r.method,
-                crc = r.crc,
-                compressedSize = r.compressedSize,
-                size = r.size,
-                dataOffset = dataOffset,
-            )
+            if (files.position > centralOffset) broken("a file runs into the central directory")
+            expected = files.position
         }
         if (expected != centralOffset) broken("there are bytes between the last file and the central directory")
         return items
@@ -190,32 +217,31 @@ internal object ZipLayout {
     /** Unpacks [item], checking it unpacks to exactly its recorded size and CRC-32. */
     fun open(raf: RandomAccessFile, item: ZipItem): InputStream = ItemInput(raf, item)
 
-    private class Record(
-        val nameBytes: ByteArray,
-        val flags: Int,
-        val method: Int,
-        val crc: Long,
-        val compressedSize: Long,
-        val size: Long,
-        val localOffset: Long,
-    )
+    /** Reads a stretch of the file through one small buffer. [position] can be moved freely. */
+    private class Region(private val raf: RandomAccessFile, start: Long, private val end: Long) {
+        private val buffer = ByteArray(64 * 1024)
+        private var bufferStart = start
+        private var bufferLength = 0
+        var position = start
 
-    private inline fun checkExtra(
-        bytes: ByteArray,
-        offset: Int,
-        length: Int,
-        broken: (String) -> Nothing,
-        unsupported: (String) -> Nothing,
-    ) {
-        var p = offset
-        val end = offset + length
-        while (p < end) {
-            if (end - p < 4) broken("a file's extra field is malformed")
-            val id = u16(bytes, p)
-            val size = u16(bytes, p + 2)
-            if (p + 4 + size > end) broken("a file's extra field is malformed")
-            if (id == ZIP64_EXTRA_ID) unsupported("ZIP64")
-            p += 4 + size
+        /** Reads [count] bytes at [position] into [into], or returns false if they run past the end. */
+        fun read(into: ByteArray, count: Int): Boolean {
+            if (position < 0 || position + count > end) return false
+            var copied = 0
+            while (copied < count) {
+                if (position < bufferStart || position >= bufferStart + bufferLength) {
+                    bufferStart = position
+                    bufferLength = minOf(buffer.size.toLong(), end - position).toInt()
+                    raf.seek(position)
+                    raf.readFully(buffer, 0, bufferLength)
+                }
+                val offset = (position - bufferStart).toInt()
+                val n = minOf(count - copied, bufferLength - offset)
+                System.arraycopy(buffer, offset, into, copied, n)
+                copied += n
+                position += n
+            }
+            return true
         }
     }
 
