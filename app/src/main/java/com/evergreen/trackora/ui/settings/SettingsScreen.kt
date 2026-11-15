@@ -1,5 +1,8 @@
 package com.evergreen.trackora.ui.settings
 
+import android.content.ActivityNotFoundException
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -41,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
@@ -72,14 +76,25 @@ import com.evergreen.trackora.util.AppVersion
  * selected" once rather than the label and the control separately.
  */
 
+const val BackupRowTag = "settings_backup"
+
+/** What a backup file is, for the save dialog's filter. */
+private const val BACKUP_MIME_TYPE = "application/zip"
+
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
     contentPadding: PaddingValues = PaddingValues()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val backupState by viewModel.backupState.collectAsState()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // The system's save dialog: the user picks the folder and may rename the file.
+    val saveBackup = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(BACKUP_MIME_TYPE)) { uri ->
+        viewModel.onBackupDestination(uri?.let { ContentDestination(context.applicationContext.contentResolver, it) })
+    }
 
     // Column headings come from resources here rather than in the view model,
     // which has no Context and should not be resolving strings.
@@ -99,6 +114,8 @@ fun SettingsScreen(
     val chooserTitle = stringResource(R.string.export_chooser_title)
     val nothingToExport = stringResource(R.string.export_nothing)
     val exportFailed = stringResource(R.string.export_failed)
+    val backupNotSaved = stringResource(R.string.backup_not_saved)
+    val backupCancelled = stringResource(R.string.backup_cancelled)
 
     LaunchedEffect(Unit) {
         viewModel.eventFlow.collect { event ->
@@ -111,6 +128,20 @@ fun SettingsScreen(
 
                 SettingsEvent.ExportFailed ->
                     snackbarHostState.showSnackbar(exportFailed)
+
+                is SettingsEvent.ChooseBackupDestination ->
+                    try {
+                        saveBackup.launch(event.fileName)
+                    } catch (e: ActivityNotFoundException) {
+                        // No app can save documents on this device; nothing was saved.
+                        viewModel.onBackupDestination(null)
+                    }
+
+                SettingsEvent.BackupNotSaved ->
+                    snackbarHostState.showSnackbar(backupNotSaved)
+
+                SettingsEvent.BackupCancelled ->
+                    snackbarHostState.showSnackbar(backupCancelled)
             }
         }
     }
@@ -123,7 +154,13 @@ fun SettingsScreen(
             onCustomFieldsChanged = viewModel::onCustomFieldsChanged,
             onReminderEnabledChanged = viewModel::onReminderEnabledChanged,
             onExportDataClick = { viewModel.exportCsv(headers) },
+            onBackupClick = viewModel::startBackup,
             contentPadding = contentPadding
+        )
+        BackupExportDialog(
+            state = backupState,
+            onCancel = viewModel::cancelBackup,
+            onDismiss = viewModel::dismissBackup,
         )
         SnackbarHost(
             hostState = snackbarHostState,
@@ -142,6 +179,7 @@ private fun SettingsScreenContent(
     onCustomFieldsChanged: (CustomFields) -> Unit,
     onReminderEnabledChanged: (Boolean) -> Unit,
     onExportDataClick: () -> Unit,
+    onBackupClick: () -> Unit,
     contentPadding: PaddingValues
 ) {
     val scrollState = rememberScrollState()
@@ -388,6 +426,27 @@ private fun SettingsScreenContent(
                     RowText(
                         title = stringResource(id = R.string.settings_export_data_label),
                         supporting = stringResource(id = R.string.settings_section_data_desc),
+                        modifier = Modifier.weight(1f)
+                    )
+                    Icon(
+                        imageVector = TrackoraIcons.Forward,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(role = Role.Button, onClick = onBackupClick)
+                        .testTag(BackupRowTag)
+                        .padding(horizontal = TrackoraSpacing.lg, vertical = TrackoraSpacing.md),
+                    horizontalArrangement = Arrangement.spacedBy(TrackoraSpacing.lg),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RowTile(icon = TrackoraIcons.Backup)
+                    RowText(
+                        title = stringResource(id = R.string.settings_backup_label),
+                        supporting = stringResource(id = R.string.settings_backup_desc),
                         modifier = Modifier.weight(1f)
                     )
                     Icon(

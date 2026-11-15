@@ -37,6 +37,7 @@ import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Remove
+import androidx.compose.material.icons.rounded.SaveAlt
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SearchOff
@@ -91,6 +92,7 @@ object TrackoraIcons {
     val AddPhoto: ImageVector = Icons.Rounded.AddPhotoAlternate
     val Calendar: ImageVector = Icons.Rounded.CalendarMonth
     val Export: ImageVector = Icons.Rounded.IosShare
+    val Backup: ImageVector = Icons.Rounded.SaveAlt
     /** An entry that has a photo attached. */
     val Photo: ImageVector = Icons.Rounded.Image
 
