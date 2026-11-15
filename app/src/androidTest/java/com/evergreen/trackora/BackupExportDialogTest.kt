@@ -1,5 +1,7 @@
 package com.evergreen.trackora
 
+import android.Manifest
+import android.os.Build
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -18,6 +20,7 @@ import com.evergreen.trackora.export.BackupSummary
 import com.evergreen.trackora.ui.settings.BackupExportDialog
 import com.evergreen.trackora.ui.settings.BackupUiState
 import org.junit.Assert.assertEquals
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -33,7 +36,17 @@ class BackupExportDialogTest {
     @get:Rule
     val compose = createEmptyComposeRule()
 
-    private val resources = InstrumentationRegistry.getInstrumentation().targetContext.resources
+    private val instrumentation = InstrumentationRegistry.getInstrumentation()
+    private val resources = instrumentation.targetContext.resources
+
+    @Before
+    fun allowNotifications() {
+        // Otherwise MainActivity asks for it on Android 13 and later; the dialog pauses
+        // the activity, and the compose test rule only sees a resumed activity's content.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            instrumentation.uiAutomation.grantRuntimePermission(instrumentation.targetContext.packageName, Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
 
     private fun text(id: Int, vararg args: Any) = resources.getString(id, *args)
 
