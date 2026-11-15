@@ -104,6 +104,7 @@ dependencies {
     implementation(project(":core:domain"))
     implementation(project(":core:data"))
     implementation(project(":core:common"))
+    implementation(project(":core:backup"))
     implementation(project(":feature:today"))
     implementation(project(":feature:addedit"))
     implementation(project(":feature:allwork"))
